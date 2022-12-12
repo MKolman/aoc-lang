@@ -4,6 +4,29 @@ Another Obscure Coding Language (AOCLang) is my attempt at creating a simple int
 
 My hope is that it will mature enough that I will be able to use it to solve Advent of Code 2023.
 
+## Primes
+
+This code prints out all prime numbers up to 100
+```
+isPrime = fn(n) {
+    m = 2
+    prime = 1
+    while m * m <= n {
+        if n % m == 0
+            prime = 0
+        m = m + 1
+    }
+    prime
+}
+
+n = 2
+while n < 100 {
+    if isPrime(n)
+        print n
+    n = n + 1
+}
+```
+
 ## Everything returns a value
 In AOCLang everything returns a value. Assignments, if statements, loops, blocks, you name it.
 
@@ -167,3 +190,4 @@ There is no return statement (yet) so just like oter statement they return the v
 - [ ] Return
 - [ ] Break
 - [ ] For loop
+- [ ] Comments

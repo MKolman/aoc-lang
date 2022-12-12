@@ -8,17 +8,9 @@ isPrime = fn(n) {
     }
     prime
 }
-a = 12
-isPrime(a)
-x = isPrime(13)
-{
-    a = 15
-    a = a + 5
-    a = a * a
-}
-if 12 < 30 / 2
-    print 12*12
 
-isEven = fn(n) n % 2 == 0
-{b = a}
-print b
+n = 2
+while n < 10000 {
+    if isPrime(n){}
+    n = n + 1
+}

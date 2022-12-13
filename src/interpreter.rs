@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     errors::{Error, Fail, Loc},
@@ -68,6 +68,26 @@ impl Env {
     pub fn set_local(&mut self, name: String, val: ExprValue) {
         self.vars.insert(name, val);
     }
+
+    pub fn get_mut_exp(&mut self, name: &ExprMeta) -> Option<&mut ExprValue> {
+        match &name.0 {
+            Expr::Identifier(name) => self.get_mut(name),
+            Expr::VecGet(expr, key) => {
+                if key.len() != 1 {
+                    return None;
+                }
+                if let Ok(ExprValue::Number(idx)) = key[0].eval(self) {
+                    match self.get_mut_exp(expr) {
+                        Some(ExprValue::Vec(vals)) => vals.get_mut(idx as usize),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -75,6 +95,25 @@ pub enum ExprValue {
     Number(i64),
     Func(Vec<String>, ExprMeta),
     Vec(Vec<ExprValue>),
+}
+
+impl Display for ExprValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Number(n) => write!(f, "{}", n),
+            Self::Func(args, _) => write!(f, "fn({})", args.join(", ")),
+            Self::Vec(vals) => {
+                write!(f, "[")?;
+                for (i, v) in vals.iter().enumerate() {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    v.fmt(f)?;
+                }
+                write!(f, "]")
+            }
+        }
+    }
 }
 
 impl ExprMeta {
@@ -161,10 +200,14 @@ impl ExprMeta {
                     .collect::<Fail<Vec<ExprValue>>>()?;
             }
             (a, v) => {
+                if let Some(store) = env.get_mut_exp(asignee) {
+                    *store = v.clone();
+                    return Ok(v);
+                }
                 return Err(Error::new(
                     asignee.1,
                     format!("Cannot assign {:?} to {:?}", v, a),
-                ))
+                ));
             }
         }
         Ok(val)
@@ -265,17 +308,7 @@ impl ExprMeta {
 
     fn eval_print(env: &mut Env, exp: &Self) -> Fail<ExprValue> {
         let result = exp.eval(env)?;
-        match &result {
-            ExprValue::Number(n) => {
-                println!("{:?}", n);
-            }
-            ExprValue::Func(args, _) => {
-                println!("fn({})", args.join(", "));
-            }
-            ExprValue::Vec(val) => {
-                println!("{:?}", val);
-            }
-        }
+        println!("{}", result);
         Ok(result)
     }
 

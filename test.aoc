@@ -15,6 +15,7 @@ isPrime = fn(n) {
 tmp = fn() isPrime
 
 print tmp
-
-
-[x, y] = [8, 9]
+a = [1, 2]
+[a[0], a[1]] = [a[1], a[0]]
+print a
+1

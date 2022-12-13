@@ -186,7 +186,7 @@ There is no return statement (yet) so just like oter statement they return the v
     * `isEven = fn(n) n % 2 == 0`
 - [ ] Read from stdin
 - [ ] Strings
-- [ ] Arrays
+- [x] Arrays
 - [ ] Return
 - [ ] Break
 - [ ] For loop

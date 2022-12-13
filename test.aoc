@@ -1,3 +1,6 @@
+[a, b] = [1, 2]
+print a
+print b
 isPrime = fn(n) {
     m = 2
     prime = 1
@@ -9,8 +12,9 @@ isPrime = fn(n) {
     prime
 }
 
-n = 2
-while n < 10000 {
-    if isPrime(n){}
-    n = n + 1
-}
+tmp = fn() isPrime
+
+print tmp
+
+
+[x, y] = [8, 9]

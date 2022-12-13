@@ -74,6 +74,7 @@ impl Env {
 pub enum ExprValue {
     Number(i64),
     Func(Vec<String>, ExprMeta),
+    Vec(Vec<ExprValue>),
 }
 
 impl ExprMeta {
@@ -82,7 +83,10 @@ impl ExprMeta {
             Expr::Number(n) => Ok(ExprValue::Number(*n)),
             Expr::BinaryOp(op, left, right) => Self::eval_binary_op(env, op, left, right),
             Expr::UnaryOp(op, exp) => Self::eval_unary_op(env, op, exp),
-            Expr::Assign(var, exp) => Self::eval_assign(env, var.to_string(), exp),
+            Expr::Assign(asignee, exp) => {
+                let rhs = exp.eval(env)?;
+                Self::eval_assign(env, asignee, rhs)
+            }
             Expr::If(cond, exp) => Self::eval_if(env, cond, exp),
             Expr::While(cond, exp) => Self::eval_while(env, cond, exp),
             Expr::Block(exps) => Self::eval_block(env, exps),
@@ -92,7 +96,9 @@ impl ExprMeta {
                 .ok_or_else(|| Error::new(self.1, format!("Unknown variable: {:?}", var)))?
                 .clone()),
             Expr::FnDef(args, exp) => Ok(ExprValue::Func(args.clone(), *exp.clone())),
-            Expr::FnCall(name, exps) => Self::eval_fn(env, self.1, name, exps),
+            Expr::FnCall(name, exps) => Self::eval_fn_call(env, self.1, name, exps),
+            Expr::VecDef(exps) => Self::eval_vec_def(env, exps),
+            Expr::VecGet(name, exps) => Self::eval_vec_get(env, self.1, name, exps),
             exp => Err(Error::new(self.1, format!("not implemented: {:?}", exp))),
         }
     }
@@ -145,9 +151,22 @@ impl ExprMeta {
         }
     }
 
-    fn eval_assign(env: &mut Env, var: String, exp: &Self) -> Fail<ExprValue> {
-        let val = exp.eval(env)?;
-        env.set(var, val.clone());
+    fn eval_assign(env: &mut Env, asignee: &Self, val: ExprValue) -> Fail<ExprValue> {
+        match (&asignee.0, val.clone()) {
+            (Expr::Identifier(name), val) => env.set(name.clone(), val),
+            (Expr::VecDef(vec), ExprValue::Vec(vals)) if vec.len() == vals.len() => {
+                vec.iter()
+                    .zip(vals)
+                    .map(|(var, val)| Self::eval_assign(env, var, val))
+                    .collect::<Fail<Vec<ExprValue>>>()?;
+            }
+            (a, v) => {
+                return Err(Error::new(
+                    asignee.1,
+                    format!("Cannot assign {:?} to {:?}", v, a),
+                ))
+            }
+        }
         Ok(val)
     }
 
@@ -176,32 +195,71 @@ impl ExprMeta {
         Ok(result)
     }
 
-    fn eval_fn(env: &mut Env, loc: Loc, name: &str, exps: &[Self]) -> Fail<ExprValue> {
-        if let Some(ExprValue::Func(args, body)) = env.get(name) {
-            if args.len() != exps.len() {
-                return Err(Error::new(
-                    loc,
-                    format!(
-                        "Incorrect number of arguments for function {}: got {}, expected {}",
-                        name,
-                        exps.len(),
-                        args.len()
-                    ),
-                ));
-            }
-            let mut local = Env::fork(env);
-            let vals = exps
-                .iter()
-                .map(|e| e.eval(&mut local))
-                .collect::<Fail<Vec<ExprValue>>>()?;
-            for (arg, val) in args.iter().zip(vals) {
-                local.set_local(arg.to_string(), val)
-            }
-            let result = body.eval(&mut local);
-            *env = local.kill().expect("I made you");
-            result
+    fn eval_vec_get(env: &mut Env, loc: Loc, func: &Self, exps: &[Self]) -> Fail<ExprValue> {
+        let left = func.eval(env)?;
+        match left {
+            ExprValue::Vec(vals) => Self::eval_vec(env, &vals, exps),
+            _ => Err(Error::new(loc, format!("{:?} is not a vec", left))),
+        }
+    }
+
+    fn eval_fn_call(env: &mut Env, loc: Loc, func: &Self, exps: &[Self]) -> Fail<ExprValue> {
+        let left = func.eval(env)?;
+        match left {
+            ExprValue::Func(args, body) => Self::eval_fn(env, loc, &args, &body, exps),
+            _ => Err(Error::new(loc, format!("{:?} is not a function", left))),
+        }
+    }
+
+    fn eval_fn(
+        env: &mut Env,
+        loc: Loc,
+        args: &[String],
+        body: &ExprMeta,
+        exps: &[Self],
+    ) -> Fail<ExprValue> {
+        if args.len() != exps.len() {
+            return Err(Error::new(
+                loc,
+                format!(
+                    "Incorrect number of arguments for function: got {}, expected {}",
+                    exps.len(),
+                    args.len()
+                ),
+            ));
+        }
+        let mut local = Env::fork(env);
+        let vals = exps
+            .iter()
+            .map(|e| e.eval(&mut local))
+            .collect::<Fail<Vec<ExprValue>>>()?;
+        for (arg, val) in args.iter().zip(vals) {
+            local.set_local(arg.to_string(), val)
+        }
+        let result = body.eval(&mut local);
+        *env = local.kill().expect("I made you");
+        result
+    }
+
+    fn eval_vec(env: &mut Env, vals: &[ExprValue], exps: &[ExprMeta]) -> Fail<ExprValue> {
+        let indexes = exps.iter().map(|exp| match exp.eval(env)? {
+            ExprValue::Number(n) => Ok((n, exp.1)),
+            _ => Err(Error::new(
+                exp.1,
+                format!("Vec indices have to be numbers not {:?}", exp.0),
+            )),
+        });
+        let copy = indexes
+            .map(|v| {
+                let (i, loc) = v?;
+                vals.get(i as usize)
+                    .ok_or_else(|| Error::new(loc, "Vec index out of range".to_string()))
+            })
+            .collect::<Fail<Vec<&ExprValue>>>()?;
+        if copy.len() == 1 {
+            Ok(copy[0].clone())
         } else {
-            Err(Error::new(loc, format!("{} is not a function", name)))
+            Ok(ExprValue::Vec(copy.clone().into_iter().cloned().collect()))
         }
     }
 
@@ -211,10 +269,21 @@ impl ExprMeta {
             ExprValue::Number(n) => {
                 println!("{:?}", n);
             }
-            ExprValue::Func(args, exp) => {
-                println!("fn({:?}) {:?}", args, exp);
+            ExprValue::Func(args, _) => {
+                println!("fn({})", args.join(", "));
+            }
+            ExprValue::Vec(val) => {
+                println!("{:?}", val);
             }
         }
         Ok(result)
+    }
+
+    fn eval_vec_def(env: &mut Env, exps: &[Self]) -> Fail<ExprValue> {
+        Ok(ExprValue::Vec(
+            exps.iter()
+                .map(|exp| exp.eval(env))
+                .collect::<Fail<Vec<ExprValue>>>()?,
+        ))
     }
 }

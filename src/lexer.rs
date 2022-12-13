@@ -18,6 +18,8 @@ pub enum TokenValue {
     CloseParen,
     OpenBrace,
     CloseBrace,
+    OpenBracket,
+    CloseBracket,
     Operator(Operator),
     Keyword(Keyword),
     Identifier(String),
@@ -165,7 +167,7 @@ impl<'a> Tokenizer<'a> {
                 c if c.to_string().parse::<Operator>().is_ok() => {
                     tokens.push(self.parse_operator()?)
                 }
-                '(' | ')' | '{' | '}' | ',' => {
+                '(' | ')' | '{' | '}' | '[' | ']' | ',' => {
                     self.advance();
                     tokens.push(Token::new(
                         match c {
@@ -174,6 +176,8 @@ impl<'a> Tokenizer<'a> {
                             ')' => TokenValue::CloseParen,
                             '{' => TokenValue::OpenBrace,
                             '}' => TokenValue::CloseBrace,
+                            '[' => TokenValue::OpenBracket,
+                            ']' => TokenValue::CloseBracket,
                             _ => {
                                 return Err(Error::new(Loc(self.pos(), self.pos()), "Wat?".into()))
                             }
@@ -186,7 +190,11 @@ impl<'a> Tokenizer<'a> {
                 c if ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) => {
                     tokens.push(self.parse_identifier_or_keyword()?)
                 }
-                ' ' | '\t' | '\n' => {
+                ';' | '\n' => {
+                    self.advance();
+                    tokens.push(Token::new(TokenValue::EOL, self.pos(), self.pos()));
+                }
+                ' ' | '\t' => {
                     self.advance();
                 }
                 _ => {

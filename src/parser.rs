@@ -10,7 +10,7 @@ pub enum Expr {
     Identifier(String),
     BinaryOp(Operator, Box<ExprMeta>, Box<ExprMeta>),
     UnaryOp(Operator, Box<ExprMeta>),
-    Assign(String, Box<ExprMeta>),
+    Assign(Box<ExprMeta>, Box<ExprMeta>),
     Block(Vec<ExprMeta>),
     Print(Box<ExprMeta>),
     Read,
@@ -18,7 +18,9 @@ pub enum Expr {
     While(Box<ExprMeta>, Box<ExprMeta>),
     For(Box<ExprMeta>, Box<ExprMeta>),
     FnDef(Vec<String>, Box<ExprMeta>),
-    FnCall(String, Vec<ExprMeta>),
+    FnCall(Box<ExprMeta>, Vec<ExprMeta>),
+    VecDef(Vec<ExprMeta>),
+    VecGet(Box<ExprMeta>, Vec<ExprMeta>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -50,27 +52,43 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_single(&mut self) -> Fail<ExprMeta> {
+        while self.check(&TokenValue::EOL) {
+            self.consume(&TokenValue::EOL)?;
+        }
         self.parse_assignment()
     }
 
     fn parse_assignment(&mut self) -> Fail<ExprMeta> {
-        let left = self.parse_binary_op(0)?;
-        let start_loc = left.1;
-        if let Some(Token(TokenValue::Operator(Operator::Assign), loc)) = self.tokens.peek() {
-            self.tokens.next();
-            if let ExprMeta(Expr::Identifier(var), _) = left {
-                let right = self.parse_assignment()?;
-                let loc = start_loc + right.1;
-                Ok(ExprMeta(Expr::Assign(var, Box::new(right)), loc))
-            } else {
-                Err(Error::new(
-                    *loc,
-                    format!("You can only assign to simple identifiers not {:?}", left.0),
-                ))
-            }
-        } else {
-            Ok(left)
+        let mut left = self.parse_vec_get()?;
+        if self.check(&TokenValue::Operator(Operator::Assign)) {
+            self.consume(&TokenValue::Operator(Operator::Assign))?;
+            let right = self.parse_assignment()?;
+            let loc = left.1 + right.1;
+            left = ExprMeta(Expr::Assign(Box::new(left), Box::new(right)), loc)
         }
+        Ok(left)
+    }
+
+    fn parse_vec_get(&mut self) -> Fail<ExprMeta> {
+        let mut left = self.parse_fn_call()?;
+        while self.check(&TokenValue::OpenBracket) {
+            let start_loc = self.consume(&TokenValue::OpenBracket)?;
+            let args = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
+            let end_loc = self.consume(&TokenValue::CloseBracket)?;
+            left = ExprMeta(Expr::VecGet(Box::new(left), args), start_loc + end_loc);
+        }
+        Ok(left)
+    }
+
+    fn parse_fn_call(&mut self) -> Fail<ExprMeta> {
+        let mut left = self.parse_binary_op(0)?;
+        while self.check(&TokenValue::OpenParen) {
+            let start_loc = self.consume(&TokenValue::OpenParen)?;
+            let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
+            let end_loc = self.consume(&TokenValue::CloseParen)?;
+            left = ExprMeta(Expr::FnCall(Box::new(left), args), start_loc + end_loc);
+        }
+        Ok(left)
     }
 
     fn parse_binary_op(&mut self, idx: usize) -> Fail<ExprMeta> {
@@ -110,9 +128,9 @@ impl<'a> Parser<'a> {
                     self.tokens.next();
                     Ok(ExprMeta(Expr::Number(*n), *loc))
                 }
-                TokenValue::Identifier(n) => {
+                TokenValue::Identifier(name) => {
                     self.tokens.next();
-                    self.parse_fn_call(n.clone(), *loc)
+                    Ok(ExprMeta(Expr::Identifier(name.clone()), *loc))
                 }
                 TokenValue::OpenParen => self.parse_paren(),
                 TokenValue::Keyword(Keyword::For) => self.parse_if(),
@@ -130,6 +148,7 @@ impl<'a> Parser<'a> {
                     Ok(ExprMeta(Expr::Print(Box::new(exp)), loc))
                 }
                 TokenValue::OpenBrace => self.parse_block(),
+                TokenValue::OpenBracket => self.parse_vec(),
                 t => Err(Error::new(*loc, format!("Unexpected token {:?}", t))),
             }
         } else {
@@ -140,43 +159,38 @@ impl<'a> Parser<'a> {
     fn parse_fn_def(&mut self) -> Fail<ExprMeta> {
         let start_loc = self.consume(&TokenValue::Keyword(Keyword::Func))?;
         self.consume(&TokenValue::OpenParen)?;
-        let mut args = Vec::new();
-        if !self.check(&TokenValue::CloseParen) {
-            while let Some(Token(TokenValue::Identifier(arg), _)) = self.tokens.peek() {
-                self.tokens.next();
-                args.push(arg.to_string());
-                if !self.check(&TokenValue::Comma) {
-                    break;
-                }
-                self.consume(&TokenValue::Comma)?;
-            }
-        }
+        let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
+        let args_names = args
+            .into_iter()
+            .map(|e| match e.0 {
+                Expr::Identifier(name) => Ok(name),
+                _ => Err(Error::new(e.1, "Epected identifier.".into())),
+            })
+            .collect::<Fail<Vec<String>>>()?;
         self.consume(&TokenValue::CloseParen)?;
+
         let body = self.parse_single()?;
         let loc = start_loc + body.1;
-        Ok(ExprMeta(Expr::FnDef(args, Box::new(body)), loc))
+        Ok(ExprMeta(Expr::FnDef(args_names, Box::new(body)), loc))
     }
 
-    fn parse_fn_call(&mut self, name: String, start_loc: Loc) -> Fail<ExprMeta> {
-        if self.check(&TokenValue::OpenParen) {
-            self.consume(&TokenValue::OpenParen)?;
-            let mut args = Vec::new();
-            if self.check(&TokenValue::CloseParen) {
-                let end_loc = self.consume(&TokenValue::CloseParen)?;
-                return Ok(ExprMeta(Expr::FnCall(name, args), start_loc + end_loc));
+    fn parse_vec(&mut self) -> Fail<ExprMeta> {
+        let start_loc = self.consume(&TokenValue::OpenBracket)?;
+        let result = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
+        let end_loc = self.consume(&TokenValue::CloseBracket)?;
+        Ok(ExprMeta(Expr::VecDef(result), start_loc + end_loc))
+    }
+
+    fn parse_comma_sep_values(&mut self, terminator: &TokenValue) -> Fail<Vec<ExprMeta>> {
+        let mut args = Vec::new();
+        while !self.check(terminator) {
+            args.push(self.parse_single()?);
+            if !self.check(&TokenValue::Comma) {
+                break;
             }
-            loop {
-                args.push(self.parse_single()?);
-                if !self.check(&TokenValue::Comma) {
-                    break;
-                }
-                self.consume(&TokenValue::Comma)?;
-            }
-            let end_loc = self.consume(&TokenValue::CloseParen)?;
-            Ok(ExprMeta(Expr::FnCall(name, args), start_loc + end_loc))
-        } else {
-            Ok(ExprMeta(Expr::Identifier(name), start_loc))
+            self.consume(&TokenValue::Comma)?;
         }
+        Ok(args)
     }
 
     fn parse_paren(&mut self) -> Fail<ExprMeta> {

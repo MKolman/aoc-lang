@@ -150,6 +150,13 @@ impl ExprMeta {
             (ExprValue::Vec(left), ExprValue::Vec(right)) if op == &Operator::Sum => {
                 Ok(ExprValue::Vec(left.into_iter().chain(right).collect()))
             }
+            (ExprValue::Vec(v), ExprValue::Number(n))
+            | (ExprValue::Number(n), ExprValue::Vec(v))
+                if op == &Operator::Mul =>
+            {
+                let l = v.len() * n as usize;
+                Ok(ExprValue::Vec(v.into_iter().cycle().take(l).collect()))
+            }
             (ExprValue::Vec(_), _) | (_, ExprValue::Vec(_)) => Err(Error::new(
                 left.1 + right.1,
                 format!("Unsupported operator {:?} for vector", op),

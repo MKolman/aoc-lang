@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use crate::{
     errors::{Error, Fail, Loc},

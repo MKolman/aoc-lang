@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Display};
+
 use crate::{
     errors::{Error, Fail, Loc},
     lexer::{Keyword, Operator, Token, TokenValue},
@@ -23,8 +25,14 @@ pub enum Expr {
     VecGet(Box<ExprMeta>, Vec<ExprMeta>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ExprMeta(pub Expr, pub Loc);
+
+impl Debug for ExprMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
 
 pub struct Parser<'a> {
     tokens: std::iter::Peekable<std::slice::Iter<'a, Token>>,
@@ -59,7 +67,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assignment(&mut self) -> Fail<ExprMeta> {
-        let mut left = self.parse_vec_get()?;
+        let mut left = self.parse_binary_op(0)?;
         if self.check(&TokenValue::Operator(Operator::Assign)) {
             self.consume(&TokenValue::Operator(Operator::Assign))?;
             let right = self.parse_assignment()?;
@@ -68,29 +76,6 @@ impl<'a> Parser<'a> {
         }
         Ok(left)
     }
-
-    fn parse_vec_get(&mut self) -> Fail<ExprMeta> {
-        let mut left = self.parse_fn_call()?;
-        while self.check(&TokenValue::OpenBracket) {
-            let start_loc = self.consume(&TokenValue::OpenBracket)?;
-            let args = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
-            let end_loc = self.consume(&TokenValue::CloseBracket)?;
-            left = ExprMeta(Expr::VecGet(Box::new(left), args), start_loc + end_loc);
-        }
-        Ok(left)
-    }
-
-    fn parse_fn_call(&mut self) -> Fail<ExprMeta> {
-        let mut left = self.parse_binary_op(0)?;
-        while self.check(&TokenValue::OpenParen) {
-            let start_loc = self.consume(&TokenValue::OpenParen)?;
-            let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
-            let end_loc = self.consume(&TokenValue::CloseParen)?;
-            left = ExprMeta(Expr::FnCall(Box::new(left), args), start_loc + end_loc);
-        }
-        Ok(left)
-    }
-
     fn parse_binary_op(&mut self, idx: usize) -> Fail<ExprMeta> {
         if let Some(bin_ops) = Operator::all_bin().get(idx) {
             let mut left = self.parse_binary_op(idx + 1)?;
@@ -118,7 +103,29 @@ impl<'a> Parser<'a> {
             let loc = *loc + exp.1;
             return Ok(ExprMeta(Expr::UnaryOp(*op, Box::new(exp)), loc));
         }
-        self.parse_atom()
+        self.parse_vec_get()
+    }
+
+    fn parse_vec_get(&mut self) -> Fail<ExprMeta> {
+        let mut left = self.parse_fn_call()?;
+        while self.check(&TokenValue::OpenBracket) {
+            let start_loc = self.consume(&TokenValue::OpenBracket)?;
+            let args = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
+            let end_loc = self.consume(&TokenValue::CloseBracket)?;
+            left = ExprMeta(Expr::VecGet(Box::new(left), args), start_loc + end_loc);
+        }
+        Ok(left)
+    }
+
+    fn parse_fn_call(&mut self) -> Fail<ExprMeta> {
+        let mut left = self.parse_atom()?;
+        while self.check(&TokenValue::OpenParen) {
+            let start_loc = self.consume(&TokenValue::OpenParen)?;
+            let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
+            let end_loc = self.consume(&TokenValue::CloseParen)?;
+            left = ExprMeta(Expr::FnCall(Box::new(left), args), start_loc + end_loc);
+        }
+        Ok(left)
     }
 
     fn parse_atom(&mut self) -> Fail<ExprMeta> {

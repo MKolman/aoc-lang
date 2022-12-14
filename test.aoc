@@ -1,21 +1,2 @@
-[a, b] = [1, 2]
-print a
-print b
-isPrime = fn(n) {
-    m = 2
-    prime = 1
-    while m * m <= n {
-        if n % m == 0
-            prime = 0
-        m = m + 1
-    }
-    prime
-}
-
-tmp = fn() isPrime
-
-print tmp
-a = [1, 2]
-[a[0], a[1]] = [a[1], a[0]]
-print a
-1
+a = [1, 2, 3]
+a[0] < a[1]

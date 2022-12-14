@@ -143,50 +143,64 @@ impl ExprMeta {
     }
 
     fn eval_binary_op(env: &mut Env, op: &Operator, left: &Self, right: &Self) -> Fail<ExprValue> {
-        if let (ExprValue::Number(n), ExprValue::Number(m)) = (left.eval(env)?, right.eval(env)?) {
-            match op {
-                Operator::Sum => Ok(ExprValue::Number(n + m)),
-                Operator::Sub => Ok(ExprValue::Number(n - m)),
-                Operator::Mul => Ok(ExprValue::Number(n * m)),
-                Operator::Div => Ok(ExprValue::Number(n / m)),
-                Operator::Mod => Ok(ExprValue::Number(n % m)),
-                Operator::Equal => Ok(ExprValue::Number((n == m) as i64)),
-                Operator::Less => Ok(ExprValue::Number((n < m) as i64)),
-                Operator::LessEq => Ok(ExprValue::Number((n <= m) as i64)),
-                Operator::More => Ok(ExprValue::Number((n > m) as i64)),
-                Operator::MoreEq => Ok(ExprValue::Number((n >= m) as i64)),
-                Operator::Or => Ok(ExprValue::Number((n != 0 || m != 0) as i64)),
-                Operator::And => Ok(ExprValue::Number((n != 0 && m != 0) as i64)),
-                Operator::XOr => Ok(ExprValue::Number(((n == 0) != (m == 0)) as i64)),
-                op => Err(Error::new(
-                    left.1 + right.1,
-                    format!("Unsupported binary operator {:?}", op),
-                )),
+        match (left.eval(env)?, right.eval(env)?) {
+            (ExprValue::Number(n), ExprValue::Number(m)) => {
+                Self::eval_binary_op_num_num(left.1 + right.1, op, n, m)
             }
-        } else {
-            Err(Error::new(
+            (ExprValue::Vec(left), ExprValue::Vec(right)) if op == &Operator::Sum => {
+                Ok(ExprValue::Vec(left.into_iter().chain(right).collect()))
+            }
+            (ExprValue::Vec(_), _) | (_, ExprValue::Vec(_)) => Err(Error::new(
+                left.1 + right.1,
+                format!("Unsupported operator {:?} for vector", op),
+            )),
+            (ExprValue::Func(_, _), _) | (_, ExprValue::Func(_, _)) => Err(Error::new(
                 left.1 + right.1,
                 "Binary operators are not supported for function definitions".into(),
-            ))
+            )),
+        }
+    }
+
+    fn eval_binary_op_num_num(loc: Loc, op: &Operator, left: i64, right: i64) -> Fail<ExprValue> {
+        match op {
+            Operator::Sum => Ok(ExprValue::Number(left + right)),
+            Operator::Sub => Ok(ExprValue::Number(left - right)),
+            Operator::Mul => Ok(ExprValue::Number(left * right)),
+            Operator::Div => Ok(ExprValue::Number(left / right)),
+            Operator::Mod => Ok(ExprValue::Number(left % right)),
+            Operator::Equal => Ok(ExprValue::Number((left == right) as i64)),
+            Operator::Less => Ok(ExprValue::Number((left < right) as i64)),
+            Operator::LessEq => Ok(ExprValue::Number((left <= right) as i64)),
+            Operator::More => Ok(ExprValue::Number((left > right) as i64)),
+            Operator::MoreEq => Ok(ExprValue::Number((left >= right) as i64)),
+            Operator::Or => Ok(ExprValue::Number((left != 0 || right != 0) as i64)),
+            Operator::And => Ok(ExprValue::Number((left != 0 && right != 0) as i64)),
+            Operator::XOr => Ok(ExprValue::Number(((left == 0) != (right == 0)) as i64)),
+            op => Err(Error::new(
+                loc,
+                format!("Unsupported binary operator {:?}", op),
+            )),
         }
     }
 
     fn eval_unary_op(env: &mut Env, op: &Operator, exp: &Self) -> Fail<ExprValue> {
-        if let ExprValue::Number(n) = exp.eval(env)? {
-            match op {
-                Operator::Sub => Ok(ExprValue::Number(-n)),
-                Operator::Sum => Ok(ExprValue::Number(n)),
-                Operator::Not => Ok(ExprValue::Number((n == 0) as i64)),
-                op => Err(Error::new(
-                    exp.1,
-                    format!("Unsupported unary operator {:?}", op),
-                )),
-            }
-        } else {
-            Err(Error::new(
+        match (exp.eval(env)?, op) {
+            (ExprValue::Number(n), Operator::Sub) => Ok(ExprValue::Number(-n)),
+            (ExprValue::Number(n), Operator::Sum) => Ok(ExprValue::Number(n)),
+            (ExprValue::Number(n), Operator::Not) => Ok(ExprValue::Number((n == 0) as i64)),
+            (ExprValue::Number(_), op) => Err(Error::new(
+                exp.1,
+                format!("Numbers don't support unary operator {:?}", op),
+            )),
+            (ExprValue::Vec(v), Operator::Sum) => Ok(ExprValue::Number(v.len() as i64)),
+            (ExprValue::Vec(_), op) => Err(Error::new(
+                exp.1,
+                format!("Vectors don't support unary operator {:?}", op),
+            )),
+            (ExprValue::Func(_, _), _) => Err(Error::new(
                 exp.1,
                 "Unary operators are not supported on function definitions.".into(),
-            ))
+            )),
         }
     }
 

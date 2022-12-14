@@ -177,17 +177,26 @@ There is no return statement (yet) so just like oter statement they return the v
 - [x] Variables
     * `a = 5 + a`
 - [x] Logical operations
-    * `a <= 10 | 5 + b < a & 12 == b
+    * `a <= 10 | 5 + b < a & 12 == b`
 - [x] If statement
     * `if x != 0 {print x}`
 - [x] While loop
     * `while x > 0 {x = x - 1}`
 - [x] Function definition and calling
     * `isEven = fn(n) n % 2 == 0`
+- [x] Vectors
+    * `a = [1, 2, [5, 6]]`
+    * `a[0] = a[1] + a[2][1]`
+    * `[x, y, z] = a`
+    * `a = a + [9, 10]`
+    * TODO:
+        * Append without making a copy
+        * Don't copy vectors all over the place
 - [ ] Read from stdin
 - [ ] Strings
-- [x] Arrays
 - [ ] Return
 - [ ] Break
 - [ ] For loop
 - [ ] Comments
+- [ ] Standard library
+- [ ] Imports

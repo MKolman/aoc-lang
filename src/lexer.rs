@@ -186,10 +186,8 @@ impl<'a> Tokenizer<'a> {
                         self.pos(),
                     ));
                 }
-                c if ('0'..='9').contains(&c) => tokens.push(self.parse_number()?),
-                c if ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) => {
-                    tokens.push(self.parse_identifier_or_keyword()?)
-                }
+                '0'..='9' => tokens.push(self.parse_number()?),
+                'a'..='z' | 'A'..='Z' | '_' => tokens.push(self.parse_identifier_or_keyword()?),
                 ';' | '\n' => {
                     self.advance();
                     tokens.push(Token::new(TokenValue::EOL, self.pos(), self.pos()));
@@ -212,16 +210,8 @@ impl<'a> Tokenizer<'a> {
     fn parse_identifier_or_keyword(&mut self) -> Result<Token, errors::Error> {
         let start = self.pos();
         let mut value = String::new();
-        while let Some(c) = self.code.peek() {
-            if ('0'..='9').contains(c)
-                || ('a'..='z').contains(c)
-                || ('A'..='Z').contains(c)
-                || c == &'_'
-            {
-                value.push(self.advance().expect("Peek was Some"));
-            } else {
-                break;
-            }
+        while let Some('a'..='z' | 'A'..='Z' | '_') = self.code.peek() {
+            value.push(self.advance().expect("Peek was Some"));
         }
 
         let t_value = if let Some(keyword) = Keyword::new(&value) {
@@ -237,13 +227,9 @@ impl<'a> Tokenizer<'a> {
         let start = self.pos();
         let zero = '0' as i64;
         let mut value = 0;
-        while let Some(c) = self.code.peek() {
-            if ('0'..='9').contains(c) {
-                value *= 10;
-                value += self.advance().expect("Peek was Some") as i64 - zero;
-            } else {
-                break;
-            }
+        while let Some('0'..='9') = self.code.peek() {
+            value *= 10;
+            value += self.advance().expect("Peek was Some") as i64 - zero;
         }
         Ok(Token::new(TokenValue::Number(value), start, self.pos()))
     }

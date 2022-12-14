@@ -10,7 +10,7 @@ impl Token {
     }
 }
 #[non_exhaustive]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenValue {
     Number(i64),
     Comma,

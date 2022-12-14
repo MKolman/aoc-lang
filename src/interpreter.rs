@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    io::{stdout, Write},
+};
 
 use crate::{
     errors::{Error, Fail, Loc},
@@ -6,62 +10,58 @@ use crate::{
     parser::{Expr, ExprMeta},
 };
 
-#[derive(Debug, Clone)]
-pub struct Env {
-    parent: Option<Box<Env>>,
+#[derive(Debug)]
+pub struct Env<W: Write> {
+    output: W,
     vars: HashMap<String, ExprValue>,
+    parents: Vec<HashMap<String, ExprValue>>,
 }
 
-impl Default for Env {
+impl Default for Env<std::io::Stdout> {
     fn default() -> Self {
-        Self::new()
+        Self::new(stdout())
     }
 }
 
-impl Env {
-    pub fn new() -> Self {
+impl<W: Write> Env<W> {
+    pub fn new(output: W) -> Self {
         Self {
-            parent: None,
+            output,
+            parents: Vec::new(),
             vars: HashMap::new(),
         }
     }
 
-    pub fn fork(env: &Env) -> Self {
-        Self {
-            parent: Some(Box::new(env.clone())),
-            vars: HashMap::new(),
-        }
+    pub fn fork(&mut self) {
+        self.parents.push(std::mem::take(&mut self.vars));
     }
 
-    pub fn kill(self) -> Option<Self> {
-        self.parent.map(|p| *p)
+    pub fn kill(&mut self) {
+        self.vars = self.parents.pop().unwrap_or_default();
     }
 
     pub fn get(&self, name: &str) -> Option<&ExprValue> {
         if let Some(val) = self.vars.get(name) {
-            Some(val)
-        } else if let Some(parent) = &self.parent {
-            parent.get(name)
-        } else {
-            None
+            return Some(val);
         }
+        self.parents.iter().rev().find_map(|vars| vars.get(name))
     }
 
     pub fn get_mut(&mut self, name: &str) -> Option<&mut ExprValue> {
         if let Some(val) = self.vars.get_mut(name) {
-            Some(val)
-        } else if let Some(parent) = &mut self.parent {
-            parent.get_mut(name)
-        } else {
-            None
+            return Some(val);
         }
+        self.parents
+            .iter_mut()
+            .rev()
+            .find_map(|vars| vars.get_mut(name))
     }
 
-    pub fn set(&mut self, name: String, val: ExprValue) {
-        if let Some(v) = self.get_mut(&name) {
+    pub fn set(&mut self, name: &str, val: ExprValue) {
+        if let Some(v) = self.get_mut(name) {
             *v = val;
         } else {
-            self.vars.insert(name, val);
+            self.vars.insert(name.to_string(), val);
         }
     }
 
@@ -93,7 +93,7 @@ impl Env {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ExprValue {
     Number(i64),
-    Func(Vec<String>, ExprMeta),
+    Func(Vec<String>, Box<ExprMeta>),
     Vec(Vec<ExprValue>),
 }
 
@@ -117,7 +117,7 @@ impl Display for ExprValue {
 }
 
 impl ExprMeta {
-    pub fn eval(&self, env: &mut Env) -> Fail<ExprValue> {
+    pub fn eval<W: Write>(&self, env: &mut Env<W>) -> Fail<ExprValue> {
         match &self.0 {
             Expr::Number(n) => Ok(ExprValue::Number(*n)),
             Expr::BinaryOp(op, left, right) => Self::eval_binary_op(env, op, left, right),
@@ -134,7 +134,7 @@ impl ExprMeta {
                 .get(var)
                 .ok_or_else(|| Error::new(self.1, format!("Unknown variable: {:?}", var)))?
                 .clone()),
-            Expr::FnDef(args, exp) => Ok(ExprValue::Func(args.clone(), *exp.clone())),
+            Expr::FnDef(args, exp) => Ok(ExprValue::Func(args.clone(), exp.clone())),
             Expr::FnCall(name, exps) => Self::eval_fn_call(env, self.1, name, exps),
             Expr::VecDef(exps) => Self::eval_vec_def(env, exps),
             Expr::VecGet(name, exps) => Self::eval_vec_get(env, self.1, name, exps),
@@ -142,7 +142,12 @@ impl ExprMeta {
         }
     }
 
-    fn eval_binary_op(env: &mut Env, op: &Operator, left: &Self, right: &Self) -> Fail<ExprValue> {
+    fn eval_binary_op<W: Write>(
+        env: &mut Env<W>,
+        op: &Operator,
+        left: &Self,
+        right: &Self,
+    ) -> Fail<ExprValue> {
         match (left.eval(env)?, right.eval(env)?) {
             (ExprValue::Number(n), ExprValue::Number(m)) => {
                 Self::eval_binary_op_num_num(left.1 + right.1, op, n, m)
@@ -190,7 +195,7 @@ impl ExprMeta {
         }
     }
 
-    fn eval_unary_op(env: &mut Env, op: &Operator, exp: &Self) -> Fail<ExprValue> {
+    fn eval_unary_op<W: Write>(env: &mut Env<W>, op: &Operator, exp: &Self) -> Fail<ExprValue> {
         match (exp.eval(env)?, op) {
             (ExprValue::Number(n), Operator::Sub) => Ok(ExprValue::Number(-n)),
             (ExprValue::Number(n), Operator::Sum) => Ok(ExprValue::Number(n)),
@@ -211,9 +216,9 @@ impl ExprMeta {
         }
     }
 
-    fn eval_assign(env: &mut Env, asignee: &Self, val: ExprValue) -> Fail<ExprValue> {
+    fn eval_assign<W: Write>(env: &mut Env<W>, asignee: &Self, val: ExprValue) -> Fail<ExprValue> {
         match (&asignee.0, val.clone()) {
-            (Expr::Identifier(name), val) => env.set(name.clone(), val),
+            (Expr::Identifier(name), val) => env.set(name, val),
             (Expr::VecDef(vec), ExprValue::Vec(vals)) if vec.len() == vals.len() => {
                 vec.iter()
                     .zip(vals)
@@ -234,24 +239,24 @@ impl ExprMeta {
         Ok(val)
     }
 
-    fn eval_if(env: &mut Env, cond: &Self, exp: &Self) -> Fail<ExprValue> {
+    fn eval_if<W: Write>(env: &mut Env<W>, cond: &Self, exp: &Self) -> Fail<ExprValue> {
         if let ExprValue::Number(0) = cond.eval(env)? {
             return Ok(ExprValue::Number(0));
         }
         exp.eval(env)
     }
 
-    fn eval_block(env: &mut Env, exps: &[Self]) -> Fail<ExprValue> {
+    fn eval_block<W: Write>(env: &mut Env<W>, exps: &[Self]) -> Fail<ExprValue> {
         let mut result = ExprValue::Number(0);
-        let mut local = Env::fork(env);
+        env.fork();
         for exp in exps {
-            result = exp.eval(&mut local)?;
+            result = exp.eval(env)?;
         }
-        *env = local.kill().expect("I made you");
+        env.kill();
         Ok(result)
     }
 
-    fn eval_while(env: &mut Env, cond: &Self, exp: &Self) -> Fail<ExprValue> {
+    fn eval_while<W: Write>(env: &mut Env<W>, cond: &Self, exp: &Self) -> Fail<ExprValue> {
         let mut result = ExprValue::Number(0);
         while cond.eval(env)? != ExprValue::Number(0) {
             result = exp.eval(env)?;
@@ -259,7 +264,12 @@ impl ExprMeta {
         Ok(result)
     }
 
-    fn eval_vec_get(env: &mut Env, loc: Loc, func: &Self, exps: &[Self]) -> Fail<ExprValue> {
+    fn eval_vec_get<W: Write>(
+        env: &mut Env<W>,
+        loc: Loc,
+        func: &Self,
+        exps: &[Self],
+    ) -> Fail<ExprValue> {
         let left = func.eval(env)?;
         match left {
             ExprValue::Vec(vals) => Self::eval_vec(env, &vals, exps),
@@ -267,7 +277,12 @@ impl ExprMeta {
         }
     }
 
-    fn eval_fn_call(env: &mut Env, loc: Loc, func: &Self, exps: &[Self]) -> Fail<ExprValue> {
+    fn eval_fn_call<W: Write>(
+        env: &mut Env<W>,
+        loc: Loc,
+        func: &Self,
+        exps: &[Self],
+    ) -> Fail<ExprValue> {
         let left = func.eval(env)?;
         match left {
             ExprValue::Func(args, body) => Self::eval_fn(env, loc, &args, &body, exps),
@@ -275,8 +290,8 @@ impl ExprMeta {
         }
     }
 
-    fn eval_fn(
-        env: &mut Env,
+    fn eval_fn<W: Write>(
+        env: &mut Env<W>,
         loc: Loc,
         args: &[String],
         body: &ExprMeta,
@@ -292,20 +307,24 @@ impl ExprMeta {
                 ),
             ));
         }
-        let mut local = Env::fork(env);
+        env.fork();
         let vals = exps
             .iter()
-            .map(|e| e.eval(&mut local))
+            .map(|e| e.eval(env))
             .collect::<Fail<Vec<ExprValue>>>()?;
         for (arg, val) in args.iter().zip(vals) {
-            local.set_local(arg.to_string(), val)
+            env.set_local(arg.to_string(), val)
         }
-        let result = body.eval(&mut local);
-        *env = local.kill().expect("I made you");
+        let result = body.eval(env);
+        env.kill();
         result
     }
 
-    fn eval_vec(env: &mut Env, vals: &[ExprValue], exps: &[ExprMeta]) -> Fail<ExprValue> {
+    fn eval_vec<W: Write>(
+        env: &mut Env<W>,
+        vals: &[ExprValue],
+        exps: &[ExprMeta],
+    ) -> Fail<ExprValue> {
         let indexes = exps.iter().map(|exp| match exp.eval(env)? {
             ExprValue::Number(n) => Ok((n, exp.1)),
             _ => Err(Error::new(
@@ -327,13 +346,14 @@ impl ExprMeta {
         }
     }
 
-    fn eval_print(env: &mut Env, exp: &Self) -> Fail<ExprValue> {
+    fn eval_print<W: Write>(env: &mut Env<W>, exp: &Self) -> Fail<ExprValue> {
         let result = exp.eval(env)?;
-        println!("{}", result);
+        writeln!(env.output, "{}", result)
+            .map_err(|_| Error::new(exp.1, "Failed to print".to_string()))?;
         Ok(result)
     }
 
-    fn eval_vec_def(env: &mut Env, exps: &[Self]) -> Fail<ExprValue> {
+    fn eval_vec_def<W: Write>(env: &mut Env<W>, exps: &[Self]) -> Fail<ExprValue> {
         Ok(ExprValue::Vec(
             exps.iter()
                 .map(|exp| exp.eval(env))

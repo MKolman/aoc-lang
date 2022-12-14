@@ -20,7 +20,7 @@ fn main() {
 
 fn interpret(fname: &str) {
     let code = &fs::read_to_string(fname).unwrap();
-    let mut env = Env::new();
+    let mut env = Env::default();
     let result = runner::run(code, &mut env);
     match &result {
         Ok(_) => {}
@@ -38,7 +38,7 @@ fn show_error(code: &str, err_prefix: &str, err: &Error) {
 fn terminal() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let mut env = Env::new();
+    let mut env = Env::default();
     loop {
         print!("> ");
         stdout.flush().unwrap();

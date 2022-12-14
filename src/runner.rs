@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::{
     errors::LangError,
     interpreter::{Env, ExprValue},
@@ -5,7 +7,7 @@ use crate::{
     parser::Parser,
 };
 
-pub fn run(code: &str, env: &mut Env) -> Result<Vec<ExprValue>, LangError> {
+pub fn run<W: Write>(code: &str, env: &mut Env<W>) -> Result<Vec<ExprValue>, LangError> {
     let tokens = Tokenizer::new(code)
         .tokenize()
         .map_err(LangError::LexerError)?;

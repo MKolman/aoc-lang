@@ -1,0 +1,23 @@
+quick_sort = fn(v, start, end) {
+    if start + 1 < end {
+        pivot = start
+        i = pivot + 1
+        while i < end {
+            if v[i] < v[pivot] {
+                [v[i], v[pivot]] = [v[pivot], v[i]]
+                [v[i], v[pivot+1]] = [v[pivot+1], v[i]]
+                pivot = pivot + 1
+            }
+            i = i + 1
+        }
+        v = quick_sort(v, start, pivot)
+        v = quick_sort(v, pivot+1, end)
+    }
+    v
+}
+
+sort = fn(v) {
+    quick_sort(v, 0, +v)
+}
+
+print sort([9, 8, 3, 2, 1, 2, 5])

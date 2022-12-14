@@ -23,7 +23,7 @@ fn interpret(fname: &str) {
     let mut env = Env::new();
     let result = runner::run(code, &mut env);
     match &result {
-        Ok(values) => println!("{:?}", values.last()),
+        Ok(_) => {}
         Err(LangError::LexerError(err)) => show_error(code, "Lexer", err),
         Err(LangError::ParserError(err)) => show_error(code, "Parser", err),
         Err(LangError::RuntimeError(err)) => show_error(code, "Runtime", err),

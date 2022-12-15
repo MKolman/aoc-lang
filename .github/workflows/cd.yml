@@ -32,6 +32,7 @@ jobs:
             os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-latest
+          - os: windows-latest
     runs-on: ${{ matrix.os }}
     needs: create-release
     steps:

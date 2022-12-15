@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
 };
 
-use lang::{
+use aoc_lang::{
     errors::{Error, LangError},
     interpreter::Env,
     runner,

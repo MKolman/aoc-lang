@@ -1,0 +1,113 @@
+<html>
+
+<head>
+    <title>Another Obscure Coding Language</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: sans-serif;
+            background: #eee;
+        }
+
+        #wrapper {
+            display: inline-flex;
+            flex-direction: column;
+            width: min(100%, 800px);
+            text-align: left;
+        }
+
+        #code {
+            height: 500px;
+            font-size: 12pt;
+        }
+
+        #run {
+            font-size: 1em;
+            padding: 0.3em 1em 0.3em 1em;
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            background-color: #272822;
+            color: white;
+        }
+
+        #run span {
+            margin-left: 1em;
+        }
+
+        #run small {
+            color: #8F908A;
+        }
+
+        #result {
+            border: solid black 1px;
+            padding: 1em;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="wrapper">
+        <h1>Another Obscure Coding Language</h1>
+        <p>This is an online interpreter for AOC Lang created by <a href="https://www.kolman.si">me</a>. See more about
+            syntax on the <a href="https://github.com/MKolman/aoc-lang">aoc-lang github repo</a>.</p>
+        <pre id="code">
+isPrime = fn(n) {
+    m = 2
+    prime = 1
+    while m * m &lt;= n {
+        if n % m == 0
+            prime = 0
+        m = m + 1
+    }
+    prime
+}
+
+n = 2
+while n &lt; 100 {
+    if isPrime(n)
+        print n
+    n = n + 1
+}</pre>
+        <button onclick="run()" id="run">
+            &gt; <span>Run<br><small>ctrl + ⏎</small></span>
+        </button>
+
+        <a href="#" onclick="cancelRun()">
+            Kill running program
+        </a>
+        <pre id="result"></pre>
+    </div>
+    <script src="lib/ace-builds-1.5.0/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        const editor = ace.edit("code");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/c_cpp");
+    </script>
+    <script>
+        const result = document.getElementById("result");
+        let worker = newRunner();
+        function run() {
+            result.innerHTML = "Running..."
+            worker.postMessage({ code: editor.getValue() });
+        }
+        function processRunResult({ success, message }) {
+            result.innerText = message;
+        }
+        function newRunner() {
+            const worker = new Worker("./runner.js");
+            worker.onmessage = event => processRunResult(event.data);
+            return worker;
+        }
+        function cancelRun() {
+            worker.terminate();
+            worker = newRunner();
+            result.innerHTML = "Canceled."
+        }
+        document.addEventListener("keydown", (event) => {
+            if (event.ctrlKey && event.keyCode == 13) run();
+        })
+    </script>
+</body>
+
+</html>

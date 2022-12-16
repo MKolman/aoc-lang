@@ -1,0 +1,14 @@
+{
+  "name": "aoc-lang",
+  "collaborators": [
+    "Maks Kolman <kolman.maks@gmail.com>"
+  ],
+  "version": "0.1.1",
+  "files": [
+    "aoc_lang_bg.wasm",
+    "aoc_lang.js",
+    "aoc_lang.d.ts"
+  ],
+  "browser": "aoc_lang.js",
+  "types": "aoc_lang.d.ts"
+}

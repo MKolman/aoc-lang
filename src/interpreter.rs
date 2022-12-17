@@ -165,7 +165,7 @@ impl ExprMeta {
 
     fn eval_block<W: Write>(env: &mut Env<W>, exps: &[Self]) -> Fail<ExprValue> {
         let mut result = ExprValue::Number(0);
-        env.fork();
+        env.fork_now(false);
         for exp in exps {
             result = exp.eval(env)?;
         }
@@ -224,7 +224,10 @@ impl ExprMeta {
                 ),
             ));
         }
-        env.fork();
+
+        // TODO: fork from function definition not function call
+        env.fork_now(true);
+
         let vals = exps
             .iter()
             .map(|e| e.eval(env))

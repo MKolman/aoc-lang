@@ -11,8 +11,8 @@ use crate::{
 #[derive(Debug)]
 pub struct Env<W: Write> {
     pub output: W,
-    vars: HashMap<String, ExprValue>,
-    parents: Vec<HashMap<String, ExprValue>>,
+    frame: Frame,
+    parents: Vec<Frame>,
 }
 
 impl Default for Env<std::io::Stdout> {
@@ -26,45 +26,71 @@ impl<W: Write> Env<W> {
         Self {
             output,
             parents: Vec::new(),
-            vars: HashMap::new(),
+            frame: Frame::default(),
         }
     }
 
-    pub fn fork(&mut self) {
-        self.parents.push(std::mem::take(&mut self.vars));
+    fn fork(&mut self, parent: Option<usize>, prevent_parent_mut: bool) {
+        self.parents.push(std::mem::replace(
+            &mut self.frame,
+            Frame::new(parent, prevent_parent_mut),
+        ));
+    }
+
+    pub fn fork_now(&mut self, prevent_parent_mut: bool) {
+        self.fork(Some(self.parents.len()), prevent_parent_mut);
+    }
+
+    pub fn fork_from(&mut self, name: &str, prevent_parent_mut: bool) {
+        let mut parent_id = self.parents.len();
+        let mut cur = &self.frame;
+        while let (None, Some(pid)) = (cur.vars.get(name), cur.parent) {
+            parent_id = pid;
+            cur = &self.parents[pid];
+        }
+        if cur.vars.get(name).is_none() {
+            parent_id = self.parents.len()
+        }
+        self.fork(Some(parent_id), prevent_parent_mut);
     }
 
     pub fn kill(&mut self) {
-        self.vars = self.parents.pop().unwrap_or_default();
+        self.frame = self.parents.pop().unwrap_or_default();
     }
 
     pub fn get(&self, name: &str) -> Option<&ExprValue> {
-        if let Some(val) = self.vars.get(name) {
-            return Some(val);
+        let mut cur = &self.frame;
+        while let (None, Some(parent_id)) = (cur.vars.get(name), cur.parent) {
+            cur = &self.parents[parent_id];
         }
-        self.parents.iter().rev().find_map(|vars| vars.get(name))
+        cur.vars.get(name)
     }
 
     pub fn get_mut(&mut self, name: &str) -> Option<&mut ExprValue> {
-        if let Some(val) = self.vars.get_mut(name) {
-            return Some(val);
+        if let Some(v) = self.frame.vars.get_mut(name) {
+            return Some(v);
         }
-        self.parents
-            .iter_mut()
-            .rev()
-            .find_map(|vars| vars.get_mut(name))
+        let Some(mut parent_id) = self.frame.parent else {return None};
+        while let (None, Some(pid), false) = (
+            self.parents[parent_id].vars.get(name),
+            self.parents[parent_id].parent,
+            self.parents[parent_id].prevent_parent_mut,
+        ) {
+            parent_id = pid;
+        }
+        self.parents[parent_id].vars.get_mut(name)
     }
 
     pub fn set(&mut self, name: &str, val: ExprValue) {
         if let Some(v) = self.get_mut(name) {
             *v = val;
         } else {
-            self.vars.insert(name.to_string(), val);
+            self.frame.vars.insert(name.to_string(), val);
         }
     }
 
     pub fn set_local(&mut self, name: String, val: ExprValue) {
-        self.vars.insert(name, val);
+        self.frame.vars.insert(name, val);
     }
 
     pub fn get_mut_exp(&mut self, name: &ExprMeta) -> Option<&mut ExprValue> {
@@ -84,6 +110,33 @@ impl<W: Write> Env<W> {
                 }
             }
             _ => None,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Frame {
+    // Saves all the local variables.
+    pub vars: HashMap<String, ExprValue>,
+    // Id of the parent frame if any.
+    pub parent: Option<usize>,
+    // Should we make the parent frame read-only and prevent mutability of
+    // variables in parent scope.
+    pub prevent_parent_mut: bool,
+}
+
+impl Default for Frame {
+    fn default() -> Self {
+        Self::new(None, false)
+    }
+}
+
+impl Frame {
+    pub fn new(parent: Option<usize>, prevent_parent_mut: bool) -> Self {
+        Frame {
+            vars: HashMap::new(),
+            parent,
+            prevent_parent_mut,
         }
     }
 }

@@ -4,8 +4,8 @@ use std::{
 };
 
 use aoc_lang::{
+    env::Env,
     errors::{Error, LangError},
-    interpreter::Env,
     runner,
 };
 

@@ -2,10 +2,7 @@ use std::io::Write;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    errors::LangError,
-    interpreter::{Env, ExprValue},
-    lexer::Tokenizer,
-    parser::Parser,
+    env::Env, errors::LangError, interpreter::ExprValue, lexer::Tokenizer, parser::Parser,
 };
 
 pub fn run<W: Write>(code: &str, env: &mut Env<W>) -> Result<Vec<ExprValue>, LangError> {

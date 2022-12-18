@@ -51,6 +51,11 @@
         <h1>Another Obscure Coding Language</h1>
         <p>This is an online interpreter for AOC Lang created by <a href="https://www.kolman.si">me</a>. See more about
             syntax on the <a href="https://github.com/MKolman/aoc-lang">aoc-lang github repo</a>.</p>
+        <label>Load examples: <select onchange="loadExample(event.target.value)">
+                <option value="primes">Prime numbers</option>
+                <option value="sort">Quick sort</option>
+                <option value="dfs">Path finder</option>
+            </select></label>
         <pre id="code">
 isPrime = fn(n) {
     m = 2
@@ -103,6 +108,12 @@ while n &lt; 100 {
             worker.terminate();
             worker = newRunner();
             result.innerHTML = "Canceled."
+        }
+        async function loadExample(name) {
+            console.log(name);
+            let resp = await fetch(`./examples/${name}.aoc`);
+            editor.setValue(await resp.text());
+
         }
         document.addEventListener("keydown", (event) => {
             if (event.ctrlKey && event.keyCode == 13) run();

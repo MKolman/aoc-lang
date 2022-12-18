@@ -112,7 +112,7 @@ while n &lt; 100 {
         async function loadExample(name) {
             console.log(name);
             let resp = await fetch(`./examples/${name}.aoc`);
-            editor.setValue(await resp.text());
+            editor.setValue(await resp.text(), -1);
 
         }
         document.addEventListener("keydown", (event) => {

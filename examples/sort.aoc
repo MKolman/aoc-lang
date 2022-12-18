@@ -10,8 +10,7 @@ quick_sort = fn(v, start, end) {
             }
             i = i + 1
         }
-        v = quick_sort(v, start, pivot)
-        v = quick_sort(v, pivot+1, end)
+        v = quick_sort(quick_sort(v, start, pivot), pivot+1, end)
     }
     v
 }
@@ -20,4 +19,4 @@ sort = fn(v) {
     quick_sort(v, 0, +v)
 }
 
-print sort([9, 8, 3, 2, 1, 2, 5])
+print sort([935, 350, 195, 957, 90, 608, 181, 109, 743, 661, 601, 842, 857, 536, 640, 507, 855, 553, 412, 41])

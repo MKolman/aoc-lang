@@ -59,7 +59,7 @@ impl FromStr for Operator {
             "^" => Ok(Operator::XOr),
             "!" => Ok(Operator::Not),
             "==" => Ok(Operator::Equal),
-            "!=" => Ok(Operator::Equal),
+            "!=" => Ok(Operator::NotEq),
             "<=" => Ok(Operator::LessEq),
             "<" => Ok(Operator::Less),
             ">=" => Ok(Operator::MoreEq),

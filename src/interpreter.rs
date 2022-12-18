@@ -14,6 +14,9 @@ pub enum ExprValue {
     Vec(Vec<ExprValue>),
 }
 
+const TRUE: ExprValue = ExprValue::Number(1);
+const FALSE: ExprValue = ExprValue::Number(0);
+
 impl Display for ExprValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -29,6 +32,16 @@ impl Display for ExprValue {
                 }
                 write!(f, "]")
             }
+        }
+    }
+}
+
+impl ExprValue {
+    pub fn bool(&self) -> bool {
+        match self {
+            Self::Number(n) => *n != 0,
+            Self::Vec(v) => !v.is_empty(),
+            _ => true,
         }
     }
 }
@@ -65,27 +78,102 @@ impl ExprMeta {
         left: &Self,
         right: &Self,
     ) -> Fail<ExprValue> {
-        match (left.eval(env)?, right.eval(env)?) {
-            (ExprValue::Number(n), ExprValue::Number(m)) => {
-                Self::eval_binary_op_num_num(left.1 + right.1, op, n, m)
+        Self::eval_binary_op_expr(left.1 + right.1, op, left.eval(env)?, right.eval(env)?)
+    }
+
+    fn eval_binary_op_expr(
+        loc: Loc,
+        op: &Operator,
+        left: ExprValue,
+        right: ExprValue,
+    ) -> Fail<ExprValue> {
+        match (op, left, right) {
+            (Operator::And, left, right) => Ok(if !left.bool() { left } else { right }),
+            (Operator::Or, left, right) => Ok(if left.bool() { left } else { right }),
+            (_, ExprValue::Number(n), ExprValue::Number(m)) => {
+                Self::eval_binary_op_num_num(loc, op, n, m)
             }
-            (ExprValue::Vec(left), ExprValue::Vec(right)) if op == &Operator::Sum => {
-                Ok(ExprValue::Vec(left.into_iter().chain(right).collect()))
+            (_, ExprValue::Vec(left), ExprValue::Vec(right)) => {
+                Self::eval_binary_op_vec_vec(loc, op, left, right)
             }
-            (ExprValue::Vec(v), ExprValue::Number(n))
-            | (ExprValue::Number(n), ExprValue::Vec(v))
+            (_, ExprValue::Vec(v), ExprValue::Number(n))
+            | (_, ExprValue::Number(n), ExprValue::Vec(v))
                 if op == &Operator::Mul =>
             {
                 let l = v.len() * n as usize;
                 Ok(ExprValue::Vec(v.into_iter().cycle().take(l).collect()))
             }
-            (ExprValue::Vec(_), _) | (_, ExprValue::Vec(_)) => Err(Error::new(
-                left.1 + right.1,
+            (_, ExprValue::Vec(_), _) | (_, _, ExprValue::Vec(_)) => Err(Error::new(
+                loc,
                 format!("Unsupported operator {:?} for vector", op),
             )),
-            (ExprValue::Func(_, _), _) | (_, ExprValue::Func(_, _)) => Err(Error::new(
-                left.1 + right.1,
+            (_, ExprValue::Func(_, _), _) | (_, _, ExprValue::Func(_, _)) => Err(Error::new(
+                loc,
                 "Binary operators are not supported for function definitions".into(),
+            )),
+        }
+    }
+
+    fn eval_binary_op_vec_vec(
+        loc: Loc,
+        op: &Operator,
+        left: Vec<ExprValue>,
+        right: Vec<ExprValue>,
+    ) -> Fail<ExprValue> {
+        match op {
+            Operator::Sum => Ok(ExprValue::Vec(left.into_iter().chain(right).collect())),
+            Operator::Equal => {
+                let mut ok = left.len() == right.len();
+                let mut c = left.into_iter().zip(right.into_iter());
+                while ok {
+                    let Some((l, r)) = c.next() else {break};
+                    ok &= Self::eval_binary_op_expr(loc, op, l, r)?.bool();
+                }
+                Ok(ExprValue::Number(ok as i64))
+            }
+            Operator::NotEq => Ok(ExprValue::Number(
+                (!Self::eval_binary_op_vec_vec(loc, &Operator::Equal, left, right)?.bool()) as i64,
+            )),
+            Operator::Less => {
+                let ok = left.len() < right.len();
+                for (l, r) in left.into_iter().zip(right.into_iter()) {
+                    if Self::eval_binary_op_expr(loc, &Operator::Less, l.clone(), r.clone())?.bool()
+                    {
+                        return Ok(TRUE);
+                    }
+                    if !Self::eval_binary_op_expr(loc, &Operator::Equal, l, r)?.bool() {
+                        return Ok(FALSE);
+                    }
+                }
+                Ok(ExprValue::Number(ok as i64))
+            }
+            Operator::LessEq => {
+                if Self::eval_binary_op_vec_vec(loc, &Operator::Equal, left.clone(), right.clone())?
+                    .bool()
+                    || Self::eval_binary_op_vec_vec(loc, &Operator::Less, left, right)?.bool()
+                {
+                    Ok(TRUE)
+                } else {
+                    Ok(FALSE)
+                }
+            }
+            Operator::More => {
+                if !Self::eval_binary_op_vec_vec(loc, &Operator::LessEq, left, right)?.bool() {
+                    Ok(TRUE)
+                } else {
+                    Ok(FALSE)
+                }
+            }
+            Operator::MoreEq => {
+                if !Self::eval_binary_op_vec_vec(loc, &Operator::Less, left, right)?.bool() {
+                    Ok(TRUE)
+                } else {
+                    Ok(FALSE)
+                }
+            }
+            op => Err(Error::new(
+                loc,
+                format!("Unsupported binary operator {:?} for vec-vec", op),
             )),
         }
     }
@@ -98,12 +186,11 @@ impl ExprMeta {
             Operator::Div => Ok(ExprValue::Number(left / right)),
             Operator::Mod => Ok(ExprValue::Number(left % right)),
             Operator::Equal => Ok(ExprValue::Number((left == right) as i64)),
+            Operator::NotEq => Ok(ExprValue::Number((left != right) as i64)),
             Operator::Less => Ok(ExprValue::Number((left < right) as i64)),
             Operator::LessEq => Ok(ExprValue::Number((left <= right) as i64)),
             Operator::More => Ok(ExprValue::Number((left > right) as i64)),
             Operator::MoreEq => Ok(ExprValue::Number((left >= right) as i64)),
-            Operator::Or => Ok(ExprValue::Number((left != 0 || right != 0) as i64)),
-            Operator::And => Ok(ExprValue::Number((left != 0 && right != 0) as i64)),
             Operator::XOr => Ok(ExprValue::Number(((left == 0) != (right == 0)) as i64)),
             op => Err(Error::new(
                 loc,
@@ -114,9 +201,9 @@ impl ExprMeta {
 
     fn eval_unary_op<W: Write>(env: &mut Env<W>, op: &Operator, exp: &Self) -> Fail<ExprValue> {
         match (exp.eval(env)?, op) {
+            (val, Operator::Not) => Ok(ExprValue::Number((!val.bool()) as i64)),
             (ExprValue::Number(n), Operator::Sub) => Ok(ExprValue::Number(-n)),
             (ExprValue::Number(n), Operator::Sum) => Ok(ExprValue::Number(n)),
-            (ExprValue::Number(n), Operator::Not) => Ok(ExprValue::Number((n == 0) as i64)),
             (ExprValue::Number(_), op) => Err(Error::new(
                 exp.1,
                 format!("Numbers don't support unary operator {:?}", op),
@@ -157,14 +244,15 @@ impl ExprMeta {
     }
 
     fn eval_if<W: Write>(env: &mut Env<W>, cond: &Self, exp: &Self) -> Fail<ExprValue> {
-        if let ExprValue::Number(0) = cond.eval(env)? {
-            return Ok(ExprValue::Number(0));
+        let cond_val = cond.eval(env)?;
+        if !cond_val.bool() {
+            return Ok(cond_val);
         }
         exp.eval(env)
     }
 
     fn eval_block<W: Write>(env: &mut Env<W>, exps: &[Self]) -> Fail<ExprValue> {
-        let mut result = ExprValue::Number(0);
+        let mut result = FALSE;
         env.fork_now(false);
         for exp in exps {
             result = exp.eval(env)?;
@@ -174,8 +262,8 @@ impl ExprMeta {
     }
 
     fn eval_while<W: Write>(env: &mut Env<W>, cond: &Self, exp: &Self) -> Fail<ExprValue> {
-        let mut result = ExprValue::Number(0);
-        while cond.eval(env)? != ExprValue::Number(0) {
+        let mut result = FALSE;
+        while cond.eval(env)?.bool() {
             result = exp.eval(env)?;
         }
         Ok(result)
@@ -255,8 +343,12 @@ impl ExprMeta {
         let copy = indexes
             .map(|v| {
                 let (i, loc) = v?;
-                vals.get(i as usize)
-                    .ok_or_else(|| Error::new(loc, "Vec index out of range".to_string()))
+                vals.get(i as usize).ok_or_else(|| {
+                    Error::new(
+                        loc,
+                        format!("Vec index out of range len: {},  index: {}", vals.len(), i),
+                    )
+                })
             })
             .collect::<Fail<Vec<&ExprValue>>>()?;
         if copy.len() == 1 {

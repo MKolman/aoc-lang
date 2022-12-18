@@ -1,0 +1,49 @@
+min = fn(a, b) {
+    if b < a
+        a = b
+    a
+}
+
+find = fn(graph, start, end) {
+    dist = 0
+    [x, y] = start
+    oldval = graph[x][y]
+    graph[x][y] = 2
+    if start != end {
+        dist = +graph * +(graph[0])
+        if x > 0 {
+            if !graph[x-1][y] {
+                dist = min(dist, 1+find(graph, [x-1, y], end))
+            }
+        }
+        if y > 0 {
+            if !graph[x][y-1] {
+                dist = min(dist, 1+find(graph, [x, y-1], end))
+            }
+        }
+        if x+1 < +graph {
+            if !graph[x+1][y] {
+                dist = min(dist, 1+find(graph, [x+1, y], end))
+            }
+        }
+        if y+1 < +(graph[x]) {
+            if !graph[x][y+1] {
+                dist = min(dist, 1+find(graph, [x, y+1], end))
+            }
+        }
+
+    }
+    graph[x][y] = oldval
+    dist
+}
+
+
+
+graph = [
+    [0, 0, 0, 0, 0, 0],
+    [1, 1, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0, 0]]
+
+print find(graph, [0, 0], [4, 5])

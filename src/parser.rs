@@ -60,16 +60,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_single(&mut self) -> Fail<ExprMeta> {
-        while self.check(&TokenValue::EOL) {
-            self.consume(&TokenValue::EOL)?;
-        }
+        while self.try_consume(&TokenValue::EOL).is_some() {}
         self.parse_assignment()
     }
 
     fn parse_assignment(&mut self) -> Fail<ExprMeta> {
         let mut left = self.parse_binary_op(0)?;
-        if self.check(&TokenValue::Operator(Operator::Assign)) {
-            self.consume(&TokenValue::Operator(Operator::Assign))?;
+        if self
+            .try_consume(&TokenValue::Operator(Operator::Assign))
+            .is_some()
+        {
             let right = self.parse_assignment()?;
             let loc = left.1 + right.1;
             left = ExprMeta(Expr::Assign(Box::new(left), Box::new(right)), loc)
@@ -108,8 +108,7 @@ impl<'a> Parser<'a> {
 
     fn parse_vec_get(&mut self) -> Fail<ExprMeta> {
         let mut left = self.parse_fn_call()?;
-        while self.check(&TokenValue::OpenBracket) {
-            let start_loc = self.consume(&TokenValue::OpenBracket)?;
+        while let Some(start_loc) = self.try_consume(&TokenValue::OpenBracket) {
             let args = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
             let end_loc = self.consume(&TokenValue::CloseBracket)?;
             left = ExprMeta(Expr::VecGet(Box::new(left), args), start_loc + end_loc);
@@ -119,8 +118,7 @@ impl<'a> Parser<'a> {
 
     fn parse_fn_call(&mut self) -> Fail<ExprMeta> {
         let mut left = self.parse_atom()?;
-        while self.check(&TokenValue::OpenParen) {
-            let start_loc = self.consume(&TokenValue::OpenParen)?;
+        while let Some(start_loc) = self.try_consume(&TokenValue::OpenParen) {
             let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
             let end_loc = self.consume(&TokenValue::CloseParen)?;
             left = ExprMeta(Expr::FnCall(Box::new(left), args), start_loc + end_loc);
@@ -192,10 +190,10 @@ impl<'a> Parser<'a> {
         let mut args = Vec::new();
         while !self.check(terminator) {
             args.push(self.parse_single()?);
-            if !self.check(&TokenValue::Comma) {
+            if self.try_consume(&TokenValue::Comma).is_none() {
                 break;
             }
-            self.consume(&TokenValue::Comma)?;
+            while self.try_consume(&TokenValue::EOL).is_some() {}
         }
         Ok(args)
     }
@@ -211,8 +209,7 @@ impl<'a> Parser<'a> {
         let start_loc = self.consume(&TokenValue::OpenBrace)?;
         let mut result = Vec::new();
         while !self.check(&TokenValue::CloseBrace) {
-            if self.check(&TokenValue::EOL) {
-                self.tokens.next();
+            if self.try_consume(&TokenValue::EOL).is_some() {
                 continue;
             }
             result.push(self.parse_single()?);
@@ -235,6 +232,14 @@ impl<'a> Parser<'a> {
         let body = self.parse_single()?;
         let loc = start_loc + body.1;
         Ok(ExprMeta(Expr::While(Box::new(cond), Box::new(body)), loc))
+    }
+
+    fn try_consume(&mut self, consume_type: &TokenValue) -> Option<Loc> {
+        if self.check(consume_type) {
+            self.consume(consume_type).ok()
+        } else {
+            None
+        }
     }
 
     fn consume(&mut self, consume_type: &TokenValue) -> Fail<Loc> {

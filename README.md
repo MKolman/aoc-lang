@@ -166,6 +166,50 @@ isPrime = fn(n) {
 ```
 There is no return statement (yet) so just like oter statement they return the value that their body return i.e. the last value in there.
 
+## Values
+
+The number of built-it types is very limited. There are only 3 types defined below. Each variable is able to hold any value and can freely change its typing.
+
+### Number
+There is only one number type. It's a signed 64 bit integer.  Construct it with number literals and mutate it using arithemtic operations.
+```
+> print 16 * 10 - 5 * (6 - 2)
+| 140
+```
+
+### Function
+Functions are first-class citizens in AOC Lang. They are assigned to variables and can be freely passed around.
+```
+isOdd = fn(n) n % 2
+isEven = fn(n, checkOdd) !checkOdd(n)
+print isEven(5, isOdd)
+| 0
+print isEven(4, idOdd)
+| 1
+```
+They have read (but not write) access to **the scope from which they are called** and not necessarily to the scope where they were defined. 
+
+### Vector
+Vectors are a collection of arbitrary other values.
+```
+v = [12 + 5, fn(x) x+1, [1, 2, 3]]
+print v[1](10)
+| 11
+v[2][1] = 10
+print v[2]
+| [1, 10, 3]
+```
+
+#### Strings
+As of now strings are just syntax sugar for initializing number arrays. Any string literal in code will be replaced with a vector containing character number codes.
+```
+> a = "Hello World"
+> print a
+| [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100]
+> prints a
+| Hello World
+```
+However an alternative printing function `prints` is available that will try to print vectors as strings and numbers as characters. Any non-convertible value will be printed as '?'.
 
 
 ## Language TODO list
@@ -192,8 +236,10 @@ There is no return statement (yet) so just like oter statement they return the v
     * TODO:
         * Append without making a copy
         * Don't copy vectors all over the place
+- [x] Strings
+    * `a = "Hello world"`
+    * `prints a`
 - [ ] Read from stdin
-- [ ] Strings
 - [ ] Return
 - [ ] Break
 - [ ] For loop

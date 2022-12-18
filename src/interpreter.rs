@@ -44,6 +44,23 @@ impl ExprValue {
             _ => true,
         }
     }
+    pub fn string(&self) -> String {
+        match self {
+            Self::Vec(v) => v.iter().map(|e| e.char()).collect(),
+            _ => self.char().to_string(),
+        }
+    }
+
+    pub fn char(&self) -> char {
+        let err = '?';
+        match self {
+            Self::Number(n) => {
+                let Ok(n) = (*n).try_into() else {return err};
+                char::from_u32(n).unwrap_or(err)
+            }
+            _ => err,
+        }
+    }
 }
 
 impl ExprMeta {
@@ -60,6 +77,7 @@ impl ExprMeta {
             Expr::While(cond, exp) => Self::eval_while(env, cond, exp),
             Expr::Block(exps) => Self::eval_block(env, exps),
             Expr::Print(exp) => Self::eval_print(env, exp),
+            Expr::PrintString(exp) => Self::eval_print_string(env, exp),
             Expr::Identifier(var) => Ok(env
                 .get(var)
                 .ok_or_else(|| Error::new(self.1, format!("Unknown variable: {:?}", var)))?
@@ -361,6 +379,13 @@ impl ExprMeta {
     fn eval_print<W: Write>(env: &mut Env<W>, exp: &Self) -> Fail<ExprValue> {
         let result = exp.eval(env)?;
         writeln!(env.output, "{}", result)
+            .map_err(|_| Error::new(exp.1, "Failed to print".to_string()))?;
+        Ok(result)
+    }
+
+    fn eval_print_string<W: Write>(env: &mut Env<W>, exp: &Self) -> Fail<ExprValue> {
+        let result = exp.eval(env)?;
+        writeln!(env.output, "{}", result.string())
             .map_err(|_| Error::new(exp.1, "Failed to print".to_string()))?;
         Ok(result)
     }

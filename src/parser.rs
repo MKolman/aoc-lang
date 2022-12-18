@@ -15,6 +15,7 @@ pub enum Expr {
     Assign(Box<ExprMeta>, Box<ExprMeta>),
     Block(Vec<ExprMeta>),
     Print(Box<ExprMeta>),
+    PrintString(Box<ExprMeta>),
     Read,
     If(Box<ExprMeta>, Box<ExprMeta>),
     While(Box<ExprMeta>, Box<ExprMeta>),
@@ -137,6 +138,10 @@ impl<'a> Parser<'a> {
                     self.tokens.next();
                     Ok(ExprMeta(Expr::Identifier(name.clone()), *loc))
                 }
+                TokenValue::String(s) => {
+                    self.tokens.next();
+                    self.parse_string(*loc, s)
+                }
                 TokenValue::OpenParen => self.parse_paren(),
                 TokenValue::Keyword(Keyword::For) => self.parse_if(),
                 TokenValue::Keyword(Keyword::If) => self.parse_if(),
@@ -145,6 +150,12 @@ impl<'a> Parser<'a> {
                 TokenValue::Keyword(Keyword::Read) => {
                     self.tokens.next();
                     Ok(ExprMeta(Expr::Read, *loc))
+                }
+                TokenValue::Keyword(Keyword::PrintString) => {
+                    self.tokens.next();
+                    let exp = self.parse_single()?;
+                    let loc = *loc + exp.1;
+                    Ok(ExprMeta(Expr::PrintString(Box::new(exp)), loc))
                 }
                 TokenValue::Keyword(Keyword::Print) => {
                     self.tokens.next();
@@ -159,6 +170,17 @@ impl<'a> Parser<'a> {
         } else {
             Err(Error::eof())
         }
+    }
+
+    fn parse_string(&mut self, loc: Loc, val: &str) -> Fail<ExprMeta> {
+        Ok(ExprMeta(
+            Expr::VecDef(
+                val.bytes()
+                    .map(|b| ExprMeta(Expr::Number(b as i64), loc))
+                    .collect(),
+            ),
+            loc,
+        ))
     }
 
     fn parse_fn_def(&mut self) -> Fail<ExprMeta> {

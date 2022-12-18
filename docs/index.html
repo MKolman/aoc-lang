@@ -19,6 +19,8 @@
         #code {
             height: 500px;
             font-size: 12pt;
+            resize: both;
+            overflow: auto;
         }
 
         #run {
@@ -88,6 +90,7 @@ while n &lt; 100 {
         const editor = ace.edit("code");
         editor.setTheme("ace/theme/monokai");
         editor.session.setMode("ace/mode/c_cpp");
+        new ResizeObserver(() => editor.resize()).observe(code);
     </script>
     <script>
         const result = document.getElementById("result");

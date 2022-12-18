@@ -1,6 +1,6 @@
 use std::{collections::HashSet, str::FromStr};
 
-use crate::errors::{self, Error, Loc, Pos};
+use crate::errors::{Error, Fail, Loc, Pos};
 
 #[derive(Debug)]
 pub struct Token(pub TokenValue, pub Loc);
@@ -23,6 +23,7 @@ pub enum TokenValue {
     Operator(Operator),
     Keyword(Keyword),
     Identifier(String),
+    String(String),
     EOL,
     EOF,
 }
@@ -106,6 +107,7 @@ pub enum Keyword {
     For,
     While,
     Print,
+    PrintString,
     Read,
     Func,
 }
@@ -116,6 +118,7 @@ impl Keyword {
             "for" => Some(Keyword::For),
             "while" => Some(Keyword::While),
             "print" => Some(Keyword::Print),
+            "prints" => Some(Keyword::PrintString),
             "read" => Some(Keyword::Read),
             "fn" => Some(Keyword::Func),
             _ => None,
@@ -160,7 +163,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, errors::Error> {
+    pub fn tokenize(&mut self) -> Fail<Vec<Token>> {
         let mut tokens = Vec::new();
         while let Some(&c) = self.code.peek() {
             match c {
@@ -192,11 +195,12 @@ impl<'a> Tokenizer<'a> {
                     self.advance();
                     tokens.push(Token::new(TokenValue::EOL, self.pos(), self.pos()));
                 }
+                '"' => tokens.push(self.parse_string()?),
                 ' ' | '\t' => {
                     self.advance();
                 }
                 _ => {
-                    return Err(errors::Error::new(
+                    return Err(Error::new(
                         Loc(self.pos(), self.pos()),
                         format!("cannot parse character '{}'", c),
                     ));
@@ -207,7 +211,7 @@ impl<'a> Tokenizer<'a> {
         Ok(tokens)
     }
 
-    fn parse_identifier_or_keyword(&mut self) -> Result<Token, errors::Error> {
+    fn parse_identifier_or_keyword(&mut self) -> Fail<Token> {
         let start = self.pos();
         let mut value = String::new();
         while let Some('a'..='z' | 'A'..='Z' | '_') = self.code.peek() {
@@ -223,7 +227,7 @@ impl<'a> Tokenizer<'a> {
         Ok(Token::new(t_value, start, self.pos()))
     }
 
-    fn parse_number(&mut self) -> Result<Token, errors::Error> {
+    fn parse_number(&mut self) -> Fail<Token> {
         let start = self.pos();
         let zero = '0' as i64;
         let mut value = 0;
@@ -234,7 +238,23 @@ impl<'a> Tokenizer<'a> {
         Ok(Token::new(TokenValue::Number(value), start, self.pos()))
     }
 
-    fn parse_operator(&mut self) -> Result<Token, errors::Error> {
+    fn parse_string(&mut self) -> Fail<Token> {
+        let start = self.pos();
+        self.advance();
+        let mut result = String::new();
+        while matches!(self.code.peek(), Some(c) if *c != '"') {
+            result.push(self.advance().unwrap());
+        }
+        if self.advance() != Some('"') {
+            return Err(Error::new(
+                Loc(start, self.pos()),
+                "String not ending with '\"'".to_string(),
+            ));
+        }
+        Ok(Token::new(TokenValue::String(result), start, self.pos()))
+    }
+
+    fn parse_operator(&mut self) -> Fail<Token> {
         let op = if let Some(c) = self.advance() {
             let mut tmp = c
                 .to_string()

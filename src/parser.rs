@@ -104,25 +104,28 @@ impl<'a> Parser<'a> {
             let loc = *loc + exp.1;
             return Ok(ExprMeta(Expr::UnaryOp(*op, Box::new(exp)), loc));
         }
-        self.parse_vec_get()
+        self.parse_fn_vec()
     }
 
-    fn parse_vec_get(&mut self) -> Fail<ExprMeta> {
-        let mut left = self.parse_fn_call()?;
-        while let Some(start_loc) = self.try_consume(&TokenValue::OpenBracket) {
-            let args = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
-            let end_loc = self.consume(&TokenValue::CloseBracket)?;
-            left = ExprMeta(Expr::VecGet(Box::new(left), args), start_loc + end_loc);
-        }
-        Ok(left)
-    }
-
-    fn parse_fn_call(&mut self) -> Fail<ExprMeta> {
+    fn parse_fn_vec(&mut self) -> Fail<ExprMeta> {
         let mut left = self.parse_atom()?;
-        while let Some(start_loc) = self.try_consume(&TokenValue::OpenParen) {
-            let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
-            let end_loc = self.consume(&TokenValue::CloseParen)?;
-            left = ExprMeta(Expr::FnCall(Box::new(left), args), start_loc + end_loc);
+        loop {
+            let mut keep_parsing = false;
+            while let Some(start_loc) = self.try_consume(&TokenValue::OpenBracket) {
+                let args = self.parse_comma_sep_values(&TokenValue::CloseBracket)?;
+                let end_loc = self.consume(&TokenValue::CloseBracket)?;
+                left = ExprMeta(Expr::VecGet(Box::new(left), args), start_loc + end_loc);
+                keep_parsing = true;
+            }
+            while let Some(start_loc) = self.try_consume(&TokenValue::OpenParen) {
+                let args = self.parse_comma_sep_values(&TokenValue::CloseParen)?;
+                let end_loc = self.consume(&TokenValue::CloseParen)?;
+                left = ExprMeta(Expr::FnCall(Box::new(left), args), start_loc + end_loc);
+                keep_parsing = true;
+            }
+            if !keep_parsing {
+                break;
+            }
         }
         Ok(left)
     }

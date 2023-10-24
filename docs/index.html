@@ -53,11 +53,14 @@
         <h1>Another Obscure Coding Language</h1>
         <p>This is an online interpreter for AOC Lang created by <a href="https://www.kolman.si">me</a>. See more about
             syntax on the <a href="https://github.com/MKolman/aoc-lang">aoc-lang github repo</a>.</p>
-        <label>Load examples: <select onchange="loadExample(event.target.value)">
-                <option value="primes">Prime numbers</option>
-                <option value="sort">Quick sort</option>
-                <option value="dfs">Path finder</option>
-            </select></label>
+
+        <div>
+            Example programs:
+            <button class="pill" onclick="loadExample('primes')">Prime numbers</button>
+            <button class="pill" onclick="loadExample('sort')">Quick sort</button>
+            <button class="pill" onclick="loadExample('dfs')">Path finder</button>
+            <button class="pill" onclick="loadExample('clojure')">Clojure</button>
+        </div>
         <pre id="code">
 isPrime = fn(n) {
     m = 2

@@ -18,7 +18,6 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Expr {
         let mut result = Vec::new();
         while let Some(token) = self.tokens.peek() {
-            eprintln!("Parsing top: {:?}", token);
             match token.kind {
                 TokenType::EOL => {
                     self.tokens.next();

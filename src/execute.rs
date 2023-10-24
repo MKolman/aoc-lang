@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Display, io::Write, rc::Rc};
 
 use crate::{
     bytecode::Operation,
-    runtime::{Chunk, Value},
+    runtime::{Capture, Chunk, Value},
 };
 
 pub struct Executor<W: Write> {
@@ -20,16 +20,23 @@ impl<W: Write> Executor<W> {
             stack: Vec::new(),
             idx: 0,
             output: None,
-            debug: true,
+            debug: false,
         }
+    }
+
+    pub fn set_debug(&mut self, debug: bool) {
+        self.debug = debug;
     }
 
     pub fn run(&mut self, output: W) -> (Value, W) {
         self.output = Some(output);
         for i in self.stack.len()..self.chunk.num_var() {
-            match &self.chunk.shared_vars[i] {
-                None => self.stack.push(Value::Nil),
-                Some(v) => self.stack.push(Value::Ref(v.clone())),
+            match &self.chunk.captured_vars[i] {
+                Capture::Local => self.stack.push(Value::Nil),
+                Capture::Owned => self
+                    .stack
+                    .push(Value::Ref(Rc::new(RefCell::new(Value::Nil)))),
+                Capture::Captured(_) => todo!(),
             };
         }
         while let Some(&cmd) = self.chunk.bytecode.get(self.idx) {
@@ -38,7 +45,20 @@ impl<W: Write> Executor<W> {
             }
             self.idx += 1;
             match cmd {
-                Operation::Constant(idx) => self.stack.push(self.chunk.get_const(idx).clone()),
+                Operation::Constant(idx) => {
+                    let mut val = self.chunk.get_const(idx).clone();
+                    if let Value::Fn {
+                        captured, chunk, ..
+                    } = &mut val
+                    {
+                        for is_captured in chunk.captured_vars.iter() {
+                            if let Capture::Captured(idx) = is_captured {
+                                captured.push(self.stack[*idx].clone());
+                            }
+                        }
+                    }
+                    self.stack.push(val);
+                }
                 Operation::Nil => self.stack.push(Value::Nil),
                 Operation::GetVar(idx) => self.get_var(idx),
                 Operation::SetVar(idx) => self.set_var(idx),
@@ -128,7 +148,7 @@ impl<W: Write> Executor<W> {
                 result.extend(b.borrow().iter().cloned());
                 Value::Vec(Rc::new(RefCell::new(result)))
             }
-            (a, b) => panic!("Unsupported Add for {:?} and {:?}", a, b),
+            (a, b) => panic!("Unsupported Add for {a} and {b}"),
         }
     }
 
@@ -138,7 +158,7 @@ impl<W: Write> Executor<W> {
             (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
             (Value::Float(a), Value::Int(b)) => Value::Float(a - b as f64),
             (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 - b),
-            (a, b) => panic!("Unsupported Sub for {:?} and {:?}", a, b),
+            (a, b) => panic!("Unsupported Sub for {a} and {b}"),
         }
     }
 
@@ -304,21 +324,42 @@ impl<W: Write> Executor<W> {
 
     fn fn_call(&mut self, num_args: usize) {
         let func = self.stack.pop().expect("Ran out of stack.");
-        let Value::Fn(n_args, chunk) = func else {
+        let Value::Fn {
+            num_params,
+            captured,
+            chunk,
+        } = func
+        else {
             panic!(
                 "Only functions can be called, not {func}. {:?}",
                 self.chunk.pos[self.idx - 1]
             );
         };
-        if n_args != num_args {
-            panic!("function expects {n_args} args, but got {num_args}");
+        if num_params != num_args {
+            panic!("function expects {num_params} args, but got {num_args}");
         }
         let args = self.stack.split_off(self.stack.len() - num_args);
-        // for (var, val) in chunk.vars.iter().zip(args.into_iter()) {
-        //     *var.borrow_mut() = val;
-        // }
         let mut executor = Self::new(chunk);
-        executor.stack = args;
+        for (arg, captured) in args.into_iter().zip(executor.chunk.captured_vars.iter()) {
+            match captured {
+                Capture::Local => executor.stack.push(arg),
+                Capture::Owned => executor.stack.push(Value::Ref(Rc::new(RefCell::new(arg)))),
+                Capture::Captured(_) => todo!(),
+            }
+        }
+        let mut captured = captured.iter();
+        for is_captured in executor.chunk.captured_vars.iter().skip(num_args) {
+            match is_captured {
+                Capture::Local => executor.stack.push(Value::Nil),
+                Capture::Owned => executor
+                    .stack
+                    .push(Value::Ref(Rc::new(RefCell::new(Value::Nil)))),
+                Capture::Captured(_) => executor.stack.push(captured.next().unwrap().clone()),
+            }
+        }
+        if self.debug {
+            eprintln!(" ==== Calling function:\n{}\n ======", executor);
+        }
         let (val, output) = executor.run(self.output.take().unwrap());
         self.stack.push(val);
         self.output = Some(output);
@@ -346,7 +387,7 @@ impl<W: Write> Display for Executor<W> {
         write!(f, "]")
     }
 }
-fn fmt_vec<T>(f: &mut std::fmt::Formatter<'_>, v: &Vec<T>) -> std::fmt::Result
+pub fn fmt_vec<T>(f: &mut std::fmt::Formatter<'_>, v: &Vec<T>) -> std::fmt::Result
 where
     T: Display,
 {

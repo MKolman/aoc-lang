@@ -265,7 +265,11 @@ impl Expr {
                 chunk = f
                     .take_parent()
                     .expect("I just added the parent, now I'm taking it back.");
-                let idx = chunk.push_const(Value::Fn(args.len(), Rc::new(f)));
+                let idx = chunk.push_const(Value::Fn {
+                    num_params: args.len(),
+                    captured: Vec::new(),
+                    chunk: Rc::new(f),
+                });
                 chunk.push_op(Operation::Constant(idx), self.pos);
             }
 

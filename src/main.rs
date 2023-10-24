@@ -1,33 +1,15 @@
-use std::{fs, rc::Rc};
+use std::fs;
 
-use aoc_lang::{
-    execute::Executor, parser::Parser, runtime::Chunk, scanner::Scanner, token::TokenType,
-};
+use aoc_lang::aoc::compile_and_run;
 
 fn main() {
     let mut args = std::env::args();
     if let Some(fname) = args.nth(1) {
-        let chunk = compile(&fname);
-        eprintln!("{:?}", chunk.bytecode);
-        let mut ex = Executor::new(Rc::new(chunk));
-        ex.run(std::io::stdout());
+        let code = &fs::read_to_string(fname).expect("File not found");
+        compile_and_run(code, std::io::stdout());
     } else {
         terminal();
     }
-}
-
-fn compile(fname: &str) -> Chunk {
-    let code = &fs::read_to_string(fname).expect("File not found");
-    let s = Scanner::new(code);
-    eprintln!(
-        "{:?}",
-        Scanner::new(code)
-            .map(|t| t.kind)
-            .collect::<Vec<TokenType>>()
-    );
-    let expr = Parser::new(s).parse();
-    eprintln!("{:?}", expr);
-    expr.to_chunk(Chunk::default())
 }
 
 fn terminal() {

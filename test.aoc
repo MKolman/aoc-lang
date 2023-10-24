@@ -1,7 +1,0 @@
-add = fn(n) {
-    a = n
-    fn(i) a+i
-}
-
-x = add(3)
-print x(1)

@@ -38,7 +38,7 @@ The return value of an arithmeic operation is its result
 
 ```
 > 3 + 1 * (2+1)
--> Number(6)
+-> Int(6)
 ```
 
 ### Variable assignment
@@ -47,14 +47,14 @@ The return value of an assignment is the value assigned
 
 ```
 > a = 12 * 5
--> Number(60)
+-> Int(60)
 ```
 
 So you can freely chain assignments
 
 ```
 > a = b = 42
--> Number(42)
+-> Int(42)
 ```
 
 ### Print
@@ -64,22 +64,22 @@ Print is a built-in keyword that outputs value to STDOUT and also returns whatev
 ```
 > b = print a = 12
 12
--> Number(12)
+-> Int(12)
 ```
 
 ### Boolean operators
 
-Boolean values are represented as Number(0) and Number(1) in AOC and more precisely any number other than 0 is equivalent to "TRUE".
+Boolean values are represented as Int(0) and Int(1) in AOC and more precisely any number other than 0 is equivalent to "TRUE".
 
 ```
 > 12 == 12
--> Number(1)
+-> Int(1)
 
 > 2 == 3
--> Number(0)
+-> Int(0)
 
 > 2 == 1 | 3 + 2 < 10 & 5 > 10 / 3
--> Number(1)
+-> Int(1)
 ```
 
 ### Block scope
@@ -92,10 +92,10 @@ Using curly braces `{` and `}` you can define a new scope where you can scope va
     a = a + 5
     a = a * a
 }
--> Number(400)
+-> Int(400)
 ```
 
-Variables defined inside the block will not leak outside but you can still change the variables in the parent scope.
+Blocks are not bariers for variable access. You can access variables from parent scope as well as from child scope.
 
 ```
 > a = 1
@@ -104,7 +104,7 @@ Variables defined inside the block will not leak outside but you can still chang
 | 2
 > {b = a}
 > print b
-| Runtime error: Error on line 0 column 6: Unknown variable: "b"
+| 2
 ```
 
 ### If statement
@@ -113,30 +113,30 @@ Variables defined inside the block will not leak outside but you can still chang
 
 ```
 > if 1 10
--> Number(10)
+-> Int(10)
 
 > if 0 10
--> Number(0)
+-> Int(0)
 
 > if 12 < 30 / 2 print 12*12
 | 144
--> Number(144)
+-> Int(144)
 ```
 
-The syntax might look a bit strange but if separate it by a new line or if the second statement is a block we get the familiar form of:
+The syntax might look a bit strange but if you separate it by a new line or if the second statement is a block we get the familiar form of:
 
 ```
 > if 12 < 30 / 2
     print 12 * 12
 | 144
--> Number(144)
+-> Int(144)
 
 > if 12 < 30 / 2 {
     print 12 * 12
     8 * 3
 }
 | 144
--> Number(24)
+-> Int(24)
 ```
 
 This means that you can also assign via if statement like
@@ -161,7 +161,7 @@ while x < 4 {
 | 1
 | 2
 | 3
--> Number(4)
+-> Int(4)
 ```
 
 ### Function
@@ -197,7 +197,17 @@ There is no return statement (yet) so just like oter statement they return the v
 
 The number of built-it types is very limited. There are only 3 types defined below. Each variable is able to hold any value and can freely change its typing.
 
-### Number
+### Nil
+
+Nil is the default value for all variables and is what it returned from an empty block. It canbe constructed using the `nil` keyword.
+
+```
+> print nil
+| nil
+-> Nil
+```
+
+### Int/Float
 
 There are two number types. A signed 64 bit integer and a 64 bit float. Construct them with number literals and mutate it using arithemtic operations.
 
@@ -234,7 +244,7 @@ print v[2]
 | [1, 10, 3]
 ```
 
-#### Strings
+### String
 
 Strings are immutable and can be constructed using double quotes.
 
@@ -260,20 +270,25 @@ Strings are immutable and can be constructed using double quotes.
   - `while x > 0 {x = x - 1}`
 - [x] Function definition and calling
   - `isEven = fn(n) n % 2 == 0`
+- [x] Clojures
+  - `adder = fn(n) fn(x) x + n`
 - [x] Vectors
   - `a = [1, 2, [5, 6]]`
   - `a[0] = a[1] + a[2][1]`
-  - `[x, y, z] = a`
   - `a = a + [9, 10]`
   - TODO:
     - Append without making a copy
+    - `[x, y, z] = a`
 - [x] Strings
   - `a = "Hello world"`
   - `print a`
 - [x] Comments
+  - `# This is a comment`
+  - `a = 3 # inline comment`
 - [ ] Read from stdin
 - [ ] Return
 - [ ] Break
 - [ ] For loop
 - [ ] Standard library
 - [ ] Imports
+- [ ] Classes

@@ -1,8 +1,8 @@
-legCounterFactory = fn(n) {
-    legsPerSubject = n
-    fn(numSubjects) legsPerSubject * numSubjects
-}
+legCounterFactory = fn(legs) fn(subjects) legs * subjects
 
 countHumanLegs = legCounterFactory(2)
+countDogLegs = legCounterFactory(4)
 print countHumanLegs(3)
 print countHumanLegs(4)
+print countDogLegs(3)
+print countDogLegs(4)

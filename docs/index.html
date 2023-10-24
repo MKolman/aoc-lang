@@ -52,7 +52,7 @@
     <div id="wrapper">
         <h1>Another Obscure Coding Language</h1>
         <p>This is an online interpreter for AOC Lang created by <a href="https://www.kolman.si">me</a>. See more about
-            syntax on the <a href="https://github.com/MKolman/aoc-lang">aoc-lang github repo</a>.</p>
+            the syntax on the <a href="https://github.com/MKolman/aoc-lang">aoc-lang github repo</a>.</p>
 
         <div>
             Example programs:
@@ -61,24 +61,7 @@
             <button class="pill" onclick="loadExample('dfs')">Path finder</button>
             <button class="pill" onclick="loadExample('clojure')">Clojure</button>
         </div>
-        <pre id="code">
-isPrime = fn(n) {
-    m = 2
-    prime = 1
-    while m * m &lt;= n {
-        if n % m == 0
-            prime = 0
-        m = m + 1
-    }
-    prime
-}
-
-n = 2
-while n &lt; 100 {
-    if isPrime(n)
-        print n
-    n = n + 1
-}</pre>
+        <pre id="code"></pre>
         <button onclick="run()" id="run">
             &gt; <span>Run<br><small>ctrl + ⏎</small></span>
         </button>
@@ -124,6 +107,7 @@ while n &lt; 100 {
         document.addEventListener("keydown", (event) => {
             if (event.ctrlKey && event.keyCode == 13) run();
         })
+        loadExample('primes');
     </script>
 </body>
 

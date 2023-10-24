@@ -11,7 +11,11 @@ pub enum Value {
     Float(f64),
     Str(Rc<String>),
     Vec(Rc<RefCell<Vec<Value>>>),
-    Fn(usize, Rc<Chunk>),
+    Fn {
+        num_params: usize,
+        captured: Vec<Value>,
+        chunk: Rc<Chunk>,
+    },
     Nil,
     Ref(Rc<RefCell<Value>>),
 }
@@ -24,7 +28,11 @@ impl Value {
             Self::Str(s) => s.len() != 0,
             Self::Nil => false,
             Self::Vec(v) => v.borrow().len() != 0,
-            Self::Fn(_, _) => true,
+            Self::Fn {
+                num_params: _,
+                captured: _,
+                chunk: _,
+            } => true,
             Self::Ref(v) => v.borrow().truthy(),
         }
     }
@@ -67,24 +75,37 @@ impl Display for Value {
                 Ok(())
             }
             Value::Nil => write!(f, "nil"),
-            Value::Fn(n_args, chunk) => {
-                write!(f, "<fn(")?;
-                let mut args = chunk.var_names.iter().collect::<Vec<_>>();
-                args.sort_unstable_by_key(|(_, &i)| i);
-                for (name, &i) in args {
-                    if i >= *n_args {
-                        break;
-                    }
-                    if i != 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{name}")?;
+            Value::Fn {
+                num_params, chunk, ..
+            } => {
+                write!(f, "<fn({})", chunk.var_names[0..*num_params].join(", "),)?;
+                let captured_var_names: Vec<_> = chunk
+                    .captured_vars
+                    .iter()
+                    .zip(chunk.var_names.iter())
+                    .filter_map(|(c, n)| {
+                        if matches!(c, Capture::Captured(_)) {
+                            Some(n)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if captured_var_names.len() > 0 {
+                    crate::execute::fmt_vec(f, &captured_var_names)?;
                 }
-                write!(f, "){{ {} bytes }}>", chunk.num_bytecode())
+                write!(f, "{{ {} bytes }}>", chunk.num_bytecode())
             }
             Value::Ref(v) => write!(f, "*{}", v.borrow()),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Capture {
+    Local,
+    Owned,
+    Captured(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -92,8 +113,9 @@ pub struct Chunk {
     pub bytecode: Vec<Operation>,
     pub pos: Vec<Pos>,
     constants: Vec<Value>,
-    var_names: HashMap<String, usize>,
-    pub shared_vars: Vec<Option<Rc<RefCell<Value>>>>,
+    var_index: HashMap<String, usize>,
+    var_names: Vec<String>,
+    pub captured_vars: Vec<Capture>,
     parent: Option<Box<Chunk>>,
 }
 
@@ -128,25 +150,26 @@ impl Chunk {
     }
 
     pub fn num_var(&self) -> usize {
-        self.var_names.len()
+        self.var_index.len()
     }
 
     pub fn num_bytecode(&self) -> usize {
         self.bytecode.len()
     }
 
-    pub fn lookup_var(&mut self, name: &str, share: bool) -> Option<usize> {
-        if let Some(&v) = self.var_names.get(name) {
-            if share && self.shared_vars[v].is_none() {
-                self.shared_vars[v] = Some(Rc::new(RefCell::new(Value::Nil)));
+    pub fn lookup_var(&mut self, name: &str, capture: bool) -> Option<usize> {
+        if let Some(&v) = self.var_index.get(name) {
+            if capture && self.captured_vars[v] == Capture::Local {
+                self.captured_vars[v] = Capture::Owned;
             }
             return Some(v);
         }
         if let Some(p) = &mut self.parent {
             if let Some(idx) = p.lookup_var(name, true) {
-                let new_idx = self.shared_vars.len();
-                self.shared_vars.push(p.shared_vars[idx].clone());
-                self.var_names.insert(name.to_string(), new_idx);
+                let new_idx = self.captured_vars.len();
+                self.captured_vars.push(Capture::Captured(idx));
+                self.var_names.push(name.to_string());
+                self.var_index.insert(name.to_string(), new_idx);
                 return Some(new_idx);
             }
         }
@@ -158,18 +181,20 @@ impl Chunk {
             return v;
         }
         let idx = self.num_var();
-        self.var_names.insert(name.to_string(), idx);
-        self.shared_vars.push(None);
+        self.var_index.insert(name.to_string(), idx);
+        self.var_names.push(name.to_string());
+        self.captured_vars.push(Capture::Local);
         idx
     }
 
     pub fn def_var(&mut self, name: &str) -> usize {
-        if let Some(v) = self.var_names.get(name) {
+        if let Some(v) = self.var_index.get(name) {
             return *v;
         }
         let idx = self.num_var();
-        self.var_names.insert(name.to_string(), idx);
-        self.shared_vars.push(None);
+        self.var_index.insert(name.to_string(), idx);
+        self.captured_vars.push(Capture::Local);
+        self.var_names.push(name.to_string());
         idx
     }
 
@@ -195,8 +220,9 @@ impl Default for Chunk {
             bytecode: vec![],
             pos: vec![],
             constants: vec![],
-            var_names: HashMap::new(),
-            shared_vars: vec![],
+            var_index: HashMap::new(),
+            var_names: vec![],
+            captured_vars: vec![],
             parent: None,
         }
     }
@@ -212,18 +238,8 @@ impl AddAssign<Chunk> for Chunk {
 
 impl Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Shared vars: [")?;
-        for (i, a) in self.shared_vars.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            if let Some(a) = a {
-                write!(f, "{}", a.borrow())?;
-            } else {
-                write!(f, "None")?;
-            }
-        }
-        write!(f, "]\nConstants: [")?;
+        writeln!(f, "Shared vars: {:?}", self.captured_vars)?;
+        write!(f, "Constants: [")?;
         for (i, a) in self.constants.iter().enumerate() {
             if i != 0 {
                 write!(f, ", ")?;

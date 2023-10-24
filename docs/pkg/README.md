@@ -7,6 +7,7 @@ My hope is that it will mature enough that I will be able to use it to solve Adv
 ## Primes
 
 This code prints out all prime numbers up to 100
+
 ```
 isPrime = fn(n) {
     m = 2
@@ -28,29 +29,38 @@ while n < 100 {
 ```
 
 ## Everything returns a value
+
 In AOCLang everything returns a value. Assignments, if statements, loops, blocks, you name it.
 
 ### Arithmetic operations
+
 The return value of an arithmeic operation is its result
+
 ```
 > 3 + 1 * (2+1)
 -> Number(6)
 ```
 
 ### Variable assignment
+
 The return value of an assignment is the value assigned
+
 ```
 > a = 12 * 5
 -> Number(60)
 ```
+
 So you can freely chain assignments
+
 ```
 > a = b = 42
 -> Number(42)
 ```
 
 ### Print
+
 Print is a built-in keyword that outputs value to STDOUT and also returns whatever it prints. So you dan do things like
+
 ```
 > b = print a = 12
 12
@@ -58,7 +68,9 @@ Print is a built-in keyword that outputs value to STDOUT and also returns whatev
 ```
 
 ### Boolean operators
+
 Boolean values are represented as Number(0) and Number(1) in AOC and more precisely any number other than 0 is equivalent to "TRUE".
+
 ```
 > 12 == 12
 -> Number(1)
@@ -71,7 +83,9 @@ Boolean values are represented as Number(0) and Number(1) in AOC and more precis
 ```
 
 ### Block scope
+
 Using curly braces `{` and `}` you can define a new scope where you can scope variables. It can contain multiple expressions (i.e. lines of code) and will return the value of the last expression in the block.
+
 ```
 > {
     a = 15
@@ -80,7 +94,9 @@ Using curly braces `{` and `}` you can define a new scope where you can scope va
 }
 -> Number(400)
 ```
+
 Variables defined inside the block will not leak outside but you can still change the variables in the parent scope.
+
 ```
 > a = 1
 > {a = a + 1}
@@ -92,7 +108,9 @@ Variables defined inside the block will not leak outside but you can still chang
 ```
 
 ### If statement
+
 `if` keyword folowed by two expressions will return the value of the second if the first is non-zeo and zero otherwise.
+
 ```
 > if 1 10
 -> Number(10)
@@ -104,7 +122,9 @@ Variables defined inside the block will not leak outside but you can still chang
 | 144
 -> Number(144)
 ```
+
 The syntax might look a bit strange but if separate it by a new line or if the second statement is a block we get the familiar form of:
+
 ```
 > if 12 < 30 / 2
     print 12 * 12
@@ -124,10 +144,13 @@ This means that you can also assign via if statement like
 ```
 > x = if x >= 100 { x - 1 }
 ```
+
 which will reduce the value of x by one if it's greater than 100 or change it to 0 otherwise.
 
 ### While loop
+
 `while` keyword followed by two staments (condition and body) will keep executing the body until the statement is 0. It will then return the last value of the body.
+
 ```
 x = 0
 while x < 4 {
@@ -142,7 +165,9 @@ while x < 4 {
 ```
 
 ### Function
-Unlike most other languages functions are considered normal values and are as such also normally assigned to variables using the `fn` keyword.
+
+Unlike some other languages functions are considered normal values and are as such also normally assigned to variables using the `fn` keyword.
+
 ```
 > isEven = fn(n) n % 2 == 0
 > print isEven(1)
@@ -152,6 +177,7 @@ Unlike most other languages functions are considered normal values and are as su
 ```
 
 Here's a more complex example:
+
 ```
 isPrime = fn(n) {
     m = 2
@@ -164,39 +190,90 @@ isPrime = fn(n) {
     prime
 }
 ```
-There is no return statement (yet) so just like oter statement they return the value that their body return i.e. the last value in there.
 
+There is no return statement (yet) so just like oter statement they return the value that their body returns i.e. the last value in there.
 
+## Values
+
+The number of built-it types is very limited. There are only 3 types defined below. Each variable is able to hold any value and can freely change its typing.
+
+### Number
+
+There are two number types. A signed 64 bit integer and a 64 bit float. Construct them with number literals and mutate it using arithemtic operations.
+
+```
+> print 16 * 10 - 5 * (6 - 2)
+| 140
+> print 12.0 / 3
+| 4.0
+```
+
+### Function
+
+Functions are first-class citizens in AOC Lang. They are assigned to variables and can be freely passed around.
+
+```
+isOdd = fn(n) n % 2
+isEven = fn(n, checkOdd) !checkOdd(n)
+print isEven(5, isOdd)
+| 0
+print isEven(4, idOdd)
+| 1
+```
+
+### Vector
+
+Vectors are a collection of arbitrary other values.
+
+```
+v = [12 + 5, fn(x) x+1, [1, 2, 3]]
+print v[1](10)
+| 11
+v[2][1] = 10
+print v[2]
+| [1, 10, 3]
+```
+
+#### Strings
+
+Strings are immutable and can be constructed using double quotes.
+
+```
+> a = "Hello World"
+> print a
+| Hello World
+```
 
 ## Language TODO list
 
 - [x] Arithmetic operations
-    * `1 + 3 / (2 - 10)`
+  - `1 + 3 / (2 - 10)`
 - [x] Printing
-    * `print 12 * 3`
+  - `print 12 * 3`
 - [x] Variables
-    * `a = 5 + a`
+  - `a = 5 + a`
 - [x] Logical operations
-    * `a <= 10 | 5 + b < a & 12 == b`
+  - `a <= 10 | 5 + b < a & 12 == b`
 - [x] If statement
-    * `if x != 0 {print x}`
+  - `if x != 0 {print x}`
 - [x] While loop
-    * `while x > 0 {x = x - 1}`
+  - `while x > 0 {x = x - 1}`
 - [x] Function definition and calling
-    * `isEven = fn(n) n % 2 == 0`
+  - `isEven = fn(n) n % 2 == 0`
 - [x] Vectors
-    * `a = [1, 2, [5, 6]]`
-    * `a[0] = a[1] + a[2][1]`
-    * `[x, y, z] = a`
-    * `a = a + [9, 10]`
-    * TODO:
-        * Append without making a copy
-        * Don't copy vectors all over the place
+  - `a = [1, 2, [5, 6]]`
+  - `a[0] = a[1] + a[2][1]`
+  - `[x, y, z] = a`
+  - `a = a + [9, 10]`
+  - TODO:
+    - Append without making a copy
+- [x] Strings
+  - `a = "Hello world"`
+  - `print a`
+- [x] Comments
 - [ ] Read from stdin
-- [ ] Strings
 - [ ] Return
 - [ ] Break
 - [ ] For loop
-- [ ] Comments
 - [ ] Standard library
 - [ ] Imports

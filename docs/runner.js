@@ -10,7 +10,7 @@ function parse({ data }) {
     let message = "error";
     const startTime = performance.now();
     try {
-        message = aoc.interpret(data.code);
+        message = aoc.run(data.code);
         success = true;
     } catch (e) {
         message = e;

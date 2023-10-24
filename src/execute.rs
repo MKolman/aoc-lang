@@ -33,6 +33,9 @@ impl<W: Write> Executor<W> {
             };
         }
         while let Some(&cmd) = self.chunk.bytecode.get(self.idx) {
+            if self.debug {
+                eprintln!("{self}\n=======");
+            }
             self.idx += 1;
             match cmd {
                 Operation::Constant(idx) => self.stack.push(self.chunk.get_const(idx).clone()),
@@ -64,9 +67,6 @@ impl<W: Write> Executor<W> {
                 Operation::JumpIf(n) => self.op_jump_if(n),
                 Operation::Noop => (),
                 Operation::FnCall(n) => self.fn_call(n),
-            }
-            if self.debug {
-                eprintln!("{self}");
             }
         }
         (
@@ -305,7 +305,10 @@ impl<W: Write> Executor<W> {
     fn fn_call(&mut self, num_args: usize) {
         let func = self.stack.pop().expect("Ran out of stack.");
         let Value::Fn(n_args, chunk) = func else {
-            panic!("Only functions can be called, not {func}");
+            panic!(
+                "Only functions can be called, not {func}. {:?}",
+                self.chunk.pos[self.idx - 1]
+            );
         };
         if n_args != num_args {
             panic!("function expects {n_args} args, but got {num_args}");
@@ -324,18 +327,21 @@ impl<W: Write> Executor<W> {
 
 impl<W: Write> Display for Executor<W> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_vec(f, &self.chunk.shared_vars)?;
-
+        writeln!(f, "{}", self.chunk)?;
+        write!(f, "Stack: ")?;
         fmt_vec(f, &self.stack)?;
-        write!(f, "\n[")?;
+        write!(f, "\nBytecode: [")?;
         for (i, a) in self.chunk.bytecode.iter().enumerate() {
             if i != 0 {
                 write!(f, ", ")?;
             }
             if i == self.idx {
-                write!(f, ">")?;
+                write!(f, " >>>")?;
             }
             write!(f, "{a:?}")?;
+            if i == self.idx {
+                write!(f, "<<< ")?;
+            }
         }
         write!(f, "]")
     }

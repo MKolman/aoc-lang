@@ -90,7 +90,7 @@ impl Display for Value {
 #[derive(Debug, Clone)]
 pub struct Chunk {
     pub bytecode: Vec<Operation>,
-    pos: Vec<Pos>,
+    pub pos: Vec<Pos>,
     constants: Vec<Value>,
     var_names: HashMap<String, usize>,
     pub shared_vars: Vec<Option<Rc<RefCell<Value>>>>,
@@ -207,5 +207,29 @@ impl AddAssign<Chunk> for Chunk {
         self.bytecode.extend(rhs.bytecode);
         self.pos.extend(rhs.pos);
         self.constants.extend(rhs.constants);
+    }
+}
+
+impl Display for Chunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Shared vars: [")?;
+        for (i, a) in self.shared_vars.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            if let Some(a) = a {
+                write!(f, "{}", a.borrow())?;
+            } else {
+                write!(f, "None")?;
+            }
+        }
+        write!(f, "]\nConstants: [")?;
+        for (i, a) in self.constants.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{a}")?;
+        }
+        write!(f, "]")
     }
 }

@@ -4,20 +4,24 @@ quick_sort = fn(v, start, end) {
         i = pivot + 1
         while i < end {
             if v[i] < v[pivot] {
-                [v[i], v[pivot]] = [v[pivot], v[i]]
-                [v[i], v[pivot+1]] = [v[pivot+1], v[i]]
+                tmp = v[pivot]
+                v[pivot] = v[i]
+                v[i] = v[pivot+1]
+                v[pivot+1] = tmp
                 pivot = pivot + 1
             }
             i = i + 1
         }
-        v = quick_sort(quick_sort(v, start, pivot), pivot+1, end)
+        quick_sort(v, start, pivot)
+        quick_sort(v, pivot+1, end)
     }
-    v
+    1
 }
 
 sort = fn(v) {
     quick_sort(v, 0, +v)
+    v
 }
 
-prints "These numbers were sorted using quick sort:"
+print "These numbers were sorted using quick sort:"
 print sort([935, 350, 195, 957, 90, 608, 181, 109, 743, 661, 601, 842, 857, 536, 640, 507, 855, 553, 412, 41])

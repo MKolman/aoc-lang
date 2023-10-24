@@ -1,2 +1,8 @@
-a = [1, 2, 3] * 10
-print a
+add = fn(x) {
+    if x > 0 {
+        add(x - 1)
+    }
+    print x
+}
+
+add(5)

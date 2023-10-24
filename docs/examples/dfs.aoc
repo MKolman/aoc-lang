@@ -6,7 +6,8 @@ min = fn(a, b) {
 
 find = fn(graph, start, end) {
     dist = 0
-    [x, y] = start
+    x = start[0]
+    y = start[1]
     oldval = graph[x][y]
     graph[x][y] = 2
     if start != end {
@@ -46,5 +47,5 @@ graph = [
     [0, 1, 1, 1, 1, 1],
     [0, 0, 0, 0, 0, 0]]
 
-prints "Shortest path from start to end of the maze was long:"
+print "Shortest path from start to end of the maze was long:"
 print find(graph, [0, 0], [4, 5])

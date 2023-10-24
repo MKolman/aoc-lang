@@ -29,7 +29,7 @@ impl<W: Write> Executor<W> {
         for i in self.stack.len()..self.chunk.num_var() {
             match &self.chunk.shared_vars[i] {
                 None => self.stack.push(Value::Nil),
-                Some(v) => self.stack.push(v.borrow().clone()),
+                Some(v) => self.stack.push(Value::Ref(v.clone())),
             };
         }
         while let Some(&cmd) = self.chunk.bytecode.get(self.idx) {

@@ -274,8 +274,9 @@ Strings are immutable and can be constructed using double quotes.
   - `adder = fn(n) fn(x) x + n`
 - [x] Vectors
   - `a = [1, 2, [5, 6]]`
-  - `a[0] = a[1] + a[2][1]`
+  - `a[0] = a[1] + a[-1][1]`
   - `a = a + [9, 10]`
+  - Slices: `a[0, 2]` -> `[1, 2]`
   - TODO:
     - Append without making a copy
     - `[x, y, z] = a`

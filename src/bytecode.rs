@@ -32,6 +32,7 @@ pub enum Operation {
     Noop,
 
     VecGet,
+    VecSlice,
     VecSet,
     VecCollect(usize),
     FnCall(usize),

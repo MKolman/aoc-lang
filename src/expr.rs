@@ -247,14 +247,20 @@ impl Expr {
                 chunk.push_op(Operation::VecCollect(exprs.len()), self.pos);
             }
 
-            ExprType::VecGet { vec, idx } => {
-                if idx.len() != 1 {
-                    todo!("Only single vector indexes are supported.")
+            ExprType::VecGet { vec, idx } => match idx.len() {
+                1 => {
+                    chunk = idx[0].to_chunk(chunk);
+                    chunk = vec.to_chunk(chunk);
+                    chunk.push_op(Operation::VecGet, self.pos);
                 }
-                chunk = idx[0].to_chunk(chunk);
-                chunk = vec.to_chunk(chunk);
-                chunk.push_op(Operation::VecGet, self.pos);
-            }
+                2 => {
+                    chunk = idx[0].to_chunk(chunk);
+                    chunk = idx[1].to_chunk(chunk);
+                    chunk = vec.to_chunk(chunk);
+                    chunk.push_op(Operation::VecSlice, self.pos);
+                }
+                _ => panic!("Only single and double vector indexes are supported."),
+            },
 
             ExprType::FnDef { args, body } => {
                 let mut f = chunk.to_child();

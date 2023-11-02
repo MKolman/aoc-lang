@@ -79,6 +79,7 @@ impl<W: Write> Executor<W> {
                 Operation::Lt => self.binary(&Self::op_lt),
                 Operation::Leq => self.binary(&Self::op_leq),
                 Operation::VecGet => self.binary(&Self::op_vec_get),
+                Operation::VecSlice => self.tertiary(&Self::op_vec_slice),
                 Operation::VecSet => self.tertiary(&Self::op_vec_set),
                 Operation::VecCollect(n) => self.vec_collect(n),
                 Operation::Print => self.print(),
@@ -207,7 +208,7 @@ impl<W: Write> Executor<W> {
         match v {
             Value::Int(i) => Value::Int(-i),
             Value::Float(f) => Value::Float(-f),
-            v => panic!("Cannot negate {:?}", v),
+            v => panic!("Cannot negate {}", v),
         }
     }
 
@@ -215,7 +216,8 @@ impl<W: Write> Executor<W> {
         match v {
             Value::Int(_) | Value::Float(_) => v,
             Value::Vec(v) => Value::Int(v.borrow().len() as i64),
-            v => panic!("Cannot negate {:?}", v),
+            Value::Str(s) => Value::Int(s.len() as i64),
+            v => panic!("Unary + invalid for {}", v),
         }
     }
 
@@ -285,21 +287,46 @@ impl<W: Write> Executor<W> {
     fn op_leq(left: Value, right: Value) -> Value {
         Self::op_not(Self::op_gt(left, right))
     }
-
     fn op_vec_get(index: Value, vec: Value) -> Value {
         match (vec, index) {
             (Value::Vec(v), Value::Int(i)) => {
                 let v = v.borrow();
-                v.get(i as usize).expect("Index out of range").clone()
+                v.get(wrap_vec_idx(i, v.len()))
+                    .expect("Index out of range")
+                    .clone()
             }
+            (Value::Str(s), Value::Int(i)) => Value::Int(
+                *s.as_bytes()
+                    .get(wrap_vec_idx(i, s.len()))
+                    .expect("String index out of range") as i64,
+            ),
             (a, b) => panic!("Unsupported VecGet for {:?}[{:?}]", a, b),
+        }
+    }
+    fn op_vec_slice(start_idx: Value, end_idx: Value, vec: Value) -> Value {
+        match (vec, start_idx, end_idx) {
+            (Value::Vec(v), Value::Int(s), Value::Int(e)) => {
+                let v = v.borrow();
+                let s = wrap_vec_idx(s, v.len());
+                let e = wrap_vec_idx(e, v.len());
+                Value::Vec(Rc::new(RefCell::new(
+                    v[s..e].into_iter().cloned().collect(),
+                )))
+            }
+            (Value::Str(st), Value::Int(s), Value::Int(e)) => {
+                let s = wrap_vec_idx(s, st.len());
+                let e = wrap_vec_idx(e, st.len());
+                Value::Str(Rc::new(st[s..e].to_string()))
+            }
+            (a, b, c) => panic!("Unsupported VecGet for {a}[{b},{c}]"),
         }
     }
     fn op_vec_set(vec: Value, index: Value, value: Value) -> Value {
         match (vec, index) {
             (Value::Vec(v), Value::Int(i)) => {
                 let mut val = v.borrow_mut();
-                val[i as usize] = value.clone();
+                let i = wrap_vec_idx(i, val.len());
+                val[i] = value.clone();
                 value
             }
             (a, b) => panic!("Unsupported VecSet for {:?}[{:?}]", a, b),
@@ -366,6 +393,19 @@ impl<W: Write> Executor<W> {
     }
 }
 
+fn wrap_vec_idx(idx: i64, len: usize) -> usize {
+    if idx < 0 {
+        if (-idx) as usize > len {
+            panic!("Index out of range");
+        }
+        len - (-idx) as usize
+    } else {
+        if idx as usize >= len {
+            panic!("Index out of range");
+        }
+        idx as usize
+    }
+}
 impl<W: Write> Display for Executor<W> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.chunk)?;

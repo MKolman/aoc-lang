@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fmt::Display;
+use std::hash::Hash;
 use std::rc::Rc;
 use std::{collections::HashMap, ops::AddAssign};
 
@@ -18,6 +19,7 @@ pub enum Value {
     },
     Nil,
     Ref(Rc<RefCell<Value>>),
+    Obj(Rc<RefCell<HashMap<Value, Value>>>),
 }
 
 impl Value {
@@ -34,6 +36,7 @@ impl Value {
                 chunk: _,
             } => true,
             Self::Ref(v) => v.borrow().truthy(),
+            Self::Obj(v) => v.borrow().len() != 0,
         }
     }
 }
@@ -52,11 +55,46 @@ impl PartialEq for Value {
                         .zip(b.borrow().iter())
                         .all(|(a, b)| a.eq(b))
             }
+            (Self::Obj(a), Self::Obj(b)) => {
+                a.borrow().len() == b.borrow().len()
+                    && a.borrow()
+                        .iter()
+                        .zip(b.borrow().iter())
+                        .all(|(a, b)| a == b)
+            }
+            (Self::Ref(v), other) | (other, Self::Ref(v)) => other.eq(&v.borrow()),
+            (
+                Self::Fn {
+                    num_params,
+                    captured,
+                    chunk,
+                },
+                Self::Fn {
+                    num_params: np,
+                    captured: ca,
+                    chunk: ch,
+                },
+            ) => np == num_params && ca == captured && Rc::ptr_eq(chunk, ch),
             _ => false,
         }
     }
 }
 
+impl Eq for Value {}
+
+impl Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Int(i) => i.hash(state),
+            Self::Float(n) => n.to_bits().hash(state),
+            Self::Str(s) => s.hash(state),
+            Self::Vec(v) => v.borrow().hash(state),
+            Self::Nil => 0.hash(state),
+            Self::Ref(v) => v.borrow().hash(state),
+            _ => panic!("Unhashable type {}!", self),
+        }
+    }
+}
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -97,6 +135,17 @@ impl Display for Value {
                 write!(f, "{{ {} bytes }}>", chunk.num_bytecode())
             }
             Value::Ref(v) => write!(f, "*{}", v.borrow()),
+            Value::Obj(o) => {
+                write!(f, "{{=")?;
+                for (i, (k, v)) in o.borrow().iter().enumerate() {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{k}: {v}")?;
+                }
+                write!(f, "}}")?;
+                Ok(())
+            }
         }
     }
 }

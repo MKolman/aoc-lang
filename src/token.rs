@@ -39,6 +39,7 @@ pub enum TokenType {
     // Parenthesis
     LParen,
     RParen,
+    OBrace,
     LBrace,
     RBrace,
     LBracket,

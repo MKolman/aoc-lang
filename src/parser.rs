@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -101,8 +102,7 @@ impl<'a> Parser<'a> {
     fn parse_fn_vec(&mut self) -> Expr {
         let mut left = self.parse_atom();
         loop {
-            let mut keep_parsing = false;
-            while let Some(start_loc) = self.try_consume(&TokenType::LBracket) {
+            if let Some(start_loc) = self.try_consume(&TokenType::LBracket) {
                 let args = self.parse_comma_sep_values(&TokenType::RBracket);
                 let end_loc = self.consume(&TokenType::RBracket);
                 left = Expr::new(
@@ -112,9 +112,9 @@ impl<'a> Parser<'a> {
                         idx: args,
                     },
                 );
-                keep_parsing = true;
+                continue;
             }
-            while let Some(start_loc) = self.try_consume(&TokenType::LParen) {
+            if let Some(start_loc) = self.try_consume(&TokenType::LParen) {
                 let args = self.parse_comma_sep_values(&TokenType::RParen);
                 let end_loc = self.consume(&TokenType::RParen);
                 left = Expr::new(
@@ -124,11 +124,26 @@ impl<'a> Parser<'a> {
                         args,
                     },
                 );
-                keep_parsing = true;
+                continue;
             }
-            if !keep_parsing {
-                break;
+            if let Some(start_pos) = self.try_consume(&TokenType::Dot) {
+                let Token {
+                    pos,
+                    kind: TokenType::Identifier(name),
+                } = self.tokens.next().expect("EOF while parsing")
+                else {
+                    panic!("Expected an identifier after a dot");
+                };
+                left = Expr::new(
+                    start_pos + pos,
+                    ExprType::VecGet {
+                        vec: Box::new(left),
+                        idx: vec![Expr::new(pos, ExprType::Str(Rc::new(name)))],
+                    },
+                );
+                continue;
             }
+            break;
         }
         left
     }
@@ -151,6 +166,7 @@ impl<'a> Parser<'a> {
                     let exp = self.parse_single();
                     Expr::new(pos + exp.pos, ExprType::Print(Box::new(exp)))
                 }
+                TokenType::OBrace => self.parse_object(pos),
                 TokenType::LBrace => self.parse_block(pos),
                 TokenType::LBracket => self.parse_vec(pos),
                 t => panic!("Unexpected token {:?}", t),
@@ -158,6 +174,11 @@ impl<'a> Parser<'a> {
         } else {
             panic!("unexpected EOF");
         }
+    }
+
+    fn parse_object(&mut self, start_pos: Pos) -> Expr {
+        self.consume(&TokenType::RBrace);
+        Expr::new(start_pos, ExprType::ObjectDef(Vec::new()))
     }
 
     fn parse_fn_def(&mut self, start_pos: Pos) -> Expr {

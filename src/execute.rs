@@ -82,6 +82,7 @@ impl<W: Write> Executor<W> {
                 Operation::VecSlice => self.tertiary(&Self::op_vec_slice),
                 Operation::VecSet => self.tertiary(&Self::op_vec_set),
                 Operation::VecCollect(n) => self.vec_collect(n),
+                Operation::ObjCollect(n) => self.obj_collect(n),
                 Operation::Print => self.print(),
                 Operation::Pop => _ = self.stack.pop(),
                 Operation::Jump(n) => self.jump(n),
@@ -300,7 +301,8 @@ impl<W: Write> Executor<W> {
                     .get(wrap_vec_idx(i, s.len()))
                     .expect("String index out of range") as i64,
             ),
-            (a, b) => panic!("Unsupported VecGet for {:?}[{:?}]", a, b),
+            (Value::Obj(o), v) => o.borrow().get(&v).unwrap_or(&Value::Nil).clone(),
+            (a, b) => panic!("Unsupported VecGet for {}[{}]", a, b),
         }
     }
     fn op_vec_slice(start_idx: Value, end_idx: Value, vec: Value) -> Value {
@@ -329,6 +331,10 @@ impl<W: Write> Executor<W> {
                 val[i] = value.clone();
                 value
             }
+            (Value::Obj(o), index) => {
+                o.borrow_mut().insert(index, value.clone());
+                value
+            }
             (a, b) => panic!("Unsupported VecSet for {:?}[{:?}]", a, b),
         }
     }
@@ -338,6 +344,16 @@ impl<W: Write> Executor<W> {
             vec.push(self.stack.pop().expect("Ran out of stack"));
         }
         self.stack.push(Value::Vec(Rc::new(RefCell::new(vec))));
+    }
+
+    fn obj_collect(&mut self, size: usize) {
+        let mut obj = std::collections::HashMap::with_capacity(size);
+        for _ in 0..size {
+            let val = self.stack.pop().expect("Ran out of stack");
+            let key = self.stack.pop().expect("Ran out of stack");
+            obj.insert(key, val);
+        }
+        self.stack.push(Value::Obj(Rc::new(RefCell::new(obj))));
     }
 
     fn print(&mut self) {

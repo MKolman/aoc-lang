@@ -278,7 +278,7 @@ Strings are immutable and can be constructed using double quotes.
   - `a = a + [9, 10]`
   - Slices: `a[0, 2]` -> `[1, 2]`
   - TODO:
-    - Append without making a copy
+    - Append without making a copy: `a << 10?`
     - `[x, y, z] = a`
 - [x] Strings
   - `a = "Hello world"`
@@ -286,10 +286,16 @@ Strings are immutable and can be constructed using double quotes.
 - [x] Comments
   - `# This is a comment`
   - `a = 3 # inline comment`
+- [x] Object
+  - `author = {=}`
+  - `author[69] = "Nice"`
+  - `author["name"] = "Maks"`
+  - `author.name = "Maks" # equivalent to above`
+  - TODO:
+    - Inline defitions `author = {= "name": "Maks", "age": 25}`
 - [ ] Read from stdin
 - [ ] Return
 - [ ] Break
 - [ ] For loop
 - [ ] Standard library
 - [ ] Imports
-- [ ] Classes

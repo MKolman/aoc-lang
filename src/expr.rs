@@ -101,6 +101,7 @@ pub enum ExprType {
         vec: Box<Expr>,
         idx: Vec<Expr>,
     },
+    ObjectDef(Vec<(Expr, Expr)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -285,6 +286,13 @@ impl Expr {
                 }
                 chunk = func.to_chunk(chunk);
                 chunk.push_op(Operation::FnCall(args.len()), self.pos);
+            }
+            ExprType::ObjectDef(fields) => {
+                for (k, v) in fields {
+                    chunk = k.to_chunk(chunk);
+                    chunk = v.to_chunk(chunk);
+                }
+                chunk.push_op(Operation::ObjCollect(fields.len()), self.pos);
             }
             ex => todo!("{:?}", ex),
         }

@@ -35,5 +35,6 @@ pub enum Operation {
     VecSlice,
     VecSet,
     VecCollect(usize),
+    ObjCollect(usize),
     FnCall(usize),
 }

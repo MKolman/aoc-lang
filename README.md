@@ -265,7 +265,7 @@ Strings are immutable and can be constructed using double quotes.
 - [x] Logical operations
   - `a <= 10 | 5 + b < a & 12 == b`
 - [x] If statement
-  - `if x != 0 {print x}`
+  - `if x != 0 {print x} else {print "Zero"}`
 - [x] While loop
   - `while x > 0 {x = x - 1}`
 - [x] Function definition and calling

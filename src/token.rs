@@ -31,6 +31,7 @@ pub enum TokenType {
     Nil,
     // Keywords
     If,
+    Else,
     For,
     Print,
     Read,
@@ -79,6 +80,7 @@ impl TokenType {
     pub fn keyword_or_identifier(v: &str) -> Self {
         match v {
             "if" => Self::If,
+            "else" => Self::Else,
             "for" => Self::For,
             "while" => Self::While,
             "print" => Self::Print,

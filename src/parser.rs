@@ -157,7 +157,6 @@ impl<'a> Parser<'a> {
                 TokenType::Identifier(name) => Expr::new(pos, ExprType::Identifier(name)),
                 TokenType::String(s) => Expr::new(pos, ExprType::Str(Rc::new(s))),
                 TokenType::LParen => self.parse_paren(),
-                TokenType::For => self.parse_if(pos),
                 TokenType::If => self.parse_if(pos),
                 TokenType::While => self.parse_while(pos),
                 TokenType::Func => self.parse_fn_def(pos),
@@ -244,12 +243,16 @@ impl<'a> Parser<'a> {
     fn parse_if(&mut self, pos: Pos) -> Expr {
         let cond = self.parse_single();
         let body = self.parse_single();
+        let mut elsebody = None;
+        if self.try_consume(&TokenType::Else).is_some() {
+            elsebody = Some(Box::new(self.parse_single()));
+        }
         Expr::new(
             pos + body.pos,
             ExprType::If {
                 cond: Box::new(cond),
                 body: Box::new(body),
-                elsebody: None,
+                elsebody,
             },
         )
     }

@@ -265,7 +265,7 @@ Strings are immutable and can be constructed using double quotes.
 - [x] Logical operations
   - `a <= 10 | 5 + b < a & 12 == b`
 - [x] If statement
-  - `if x != 0 {print x}`
+  - `if x != 0 {print x} else {print "Zero"}`
 - [x] While loop
   - `while x > 0 {x = x - 1}`
 - [x] Function definition and calling
@@ -274,10 +274,11 @@ Strings are immutable and can be constructed using double quotes.
   - `adder = fn(n) fn(x) x + n`
 - [x] Vectors
   - `a = [1, 2, [5, 6]]`
-  - `a[0] = a[1] + a[2][1]`
+  - `a[0] = a[1] + a[-1][1]`
   - `a = a + [9, 10]`
+  - Slices: `a[0, 2]` -> `[1, 2]`
   - TODO:
-    - Append without making a copy
+    - Append without making a copy: `a << 10?`
     - `[x, y, z] = a`
 - [x] Strings
   - `a = "Hello world"`
@@ -285,10 +286,16 @@ Strings are immutable and can be constructed using double quotes.
 - [x] Comments
   - `# This is a comment`
   - `a = 3 # inline comment`
+- [x] Object
+  - `author = {=}`
+  - `author[69] = "Nice"`
+  - `author["name"] = "Maks"`
+  - `author.name = "Maks" # equivalent to above`
+  - TODO:
+    - Inline defitions `author = {= "name": "Maks", "age": 25}`
 - [ ] Read from stdin
 - [ ] Return
 - [ ] Break
 - [ ] For loop
 - [ ] Standard library
 - [ ] Imports
-- [ ] Classes

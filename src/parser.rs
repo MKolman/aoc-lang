@@ -159,6 +159,7 @@ impl<'a> Parser<'a> {
                 TokenType::LParen => self.parse_paren(),
                 TokenType::If => self.parse_if(pos),
                 TokenType::While => self.parse_while(pos),
+                TokenType::For => self.parse_for(pos),
                 TokenType::Func => self.parse_fn_def(pos),
                 TokenType::Read => self.parse_read(pos),
                 TokenType::Print => self.parse_print(pos),
@@ -277,6 +278,26 @@ impl<'a> Parser<'a> {
                 cond: Box::new(cond),
                 body: Box::new(body),
             },
+        )
+    }
+
+    fn parse_for(&mut self, start_pos: Pos) -> Expr {
+        let init = self.parse_single();
+        let cond = self.parse_single();
+        let suff = self.parse_single();
+        let body = self.parse_single();
+        Expr::new(
+            start_pos + body.pos,
+            ExprType::Block(vec![
+                init,
+                Expr::new(
+                    cond.pos + body.pos,
+                    ExprType::While {
+                        cond: Box::new(cond),
+                        body: Box::new(Expr::new(body.pos, ExprType::Block(vec![body, suff]))),
+                    },
+                ),
+            ]),
         )
     }
 

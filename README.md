@@ -295,8 +295,9 @@ Strings are immutable and can be constructed using double quotes.
     - Inline defitions `author = {= "name": "Maks", "age": 25}`
 - [x] Read a line from stdin
   - `a = read()`
+- [x] For loop
+  - `for i = 0; i < 10; i = i + 1 { print(i) }`
 - [ ] Return
 - [ ] Break
-- [ ] For loop
 - [ ] Standard library
 - [ ] Imports

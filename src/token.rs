@@ -30,6 +30,7 @@ pub enum TokenType {
     Identifier(String),
     Nil,
     // Keywords
+    Return,
     If,
     Else,
     For,
@@ -87,6 +88,7 @@ impl TokenType {
             "read" => Self::Read,
             "fn" => Self::Func,
             "nil" => Self::Nil,
+            "return" => Self::Return,
             v => Self::Identifier(v.to_string()),
         }
     }

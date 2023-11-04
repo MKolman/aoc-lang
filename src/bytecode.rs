@@ -28,6 +28,7 @@ pub enum Operation {
 
     Pop,
 
+    Return,
     Jump(i64),
     JumpIf(i64),
     Noop,

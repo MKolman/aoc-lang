@@ -166,6 +166,7 @@ impl<'a> Parser<'a> {
                 TokenType::OBrace => self.parse_object(pos),
                 TokenType::LBrace => self.parse_block(pos),
                 TokenType::LBracket => self.parse_vec(pos),
+                TokenType::Return => self.parse_return(pos),
                 t => panic!("Unexpected token {:?}", t),
             }
         } else {
@@ -299,6 +300,11 @@ impl<'a> Parser<'a> {
                 ),
             ]),
         )
+    }
+
+    fn parse_return(&mut self, start_pos: Pos) -> Expr {
+        let result = self.parse_single();
+        Expr::new(start_pos + result.pos, ExprType::Return(Box::new(result)))
     }
 
     fn try_consume_operator(&mut self, ops: Option<&HashSet<Operator>>) -> Option<(Pos, Operator)> {

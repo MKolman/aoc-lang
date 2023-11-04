@@ -45,6 +45,7 @@ impl<W: Write> Executor<W> {
             }
             self.idx += 1;
             match cmd {
+                Operation::Return => break,
                 Operation::Constant(idx) => {
                     let mut val = self.chunk.get_const(idx).clone();
                     if let Value::Fn {

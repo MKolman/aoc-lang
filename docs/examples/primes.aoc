@@ -1,10 +1,9 @@
 isPrime = fn(n) {
-    prime = 1
     for m = 2; m * m <= n; m = m + 1 {
         if n % m == 0
-            prime = 0
+            return 0
     }
-    prime
+    1
 }
 
 findPrimes = fn(n) {

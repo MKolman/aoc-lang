@@ -195,7 +195,7 @@ There is no return statement (yet) so just like oter statement they return the v
 
 ## Values
 
-The number of built-it types is very limited. There are only 3 types defined below. Each variable is able to hold any value and can freely change its typing.
+The number of built-it types is very limited. There are many types as defined below. Each variable is able to hold any value and can freely change its typing.
 
 ### Nil
 
@@ -244,6 +244,46 @@ print(v[2])
 | [1, 10, 3]
 ```
 
+### Object
+
+Objects are a collection of key-value pairs. They can be accessed using the square brackets.
+The dot notation is just a syntactic sugar for accessing string keys.
+
+```
+author = {= "name"="Maks", "age"=25} # TODO inline definition
+author.name = "Maks Kolman" # same as author["name"] = "Maks Kolman"
+author["age"] = author.age + 5
+author[69] = "Nice"
+print(author)
+| {=age: 30, name: Maks Kolman, 69: Nice}
+```
+
+#### Object builders
+
+We can use objects as poor-mans classes by using object builder functions.
+These function return an object with some public fields and methods attached to it.
+You can always have private fields by defining local variables in the function body
+and then using them in the methods.
+
+```
+Animal = fn(name, sound, legs) {
+  # name, sound and legs are private values for Animal. To make
+  # them public we would append them to the animal object below
+  animal = {=}
+  animal.speak = fn() print(name, " says: ", sound)
+  anumal.walk = fn() print(name, " walks on ", legs, " legs")
+  animal
+}
+roo = Animal("Kangaroo", "Woof", 2)
+roo.speak()
+| Kangaroo says: Woof
+fox = Animal("Fox", "Wa-pa-pa-pa-pa-pa-pow!", 4)
+fox.speak()
+| Fox says: Wa-pa-pa-pa-pa-pa-pow!
+fox.walk()
+| Fox walks on 4 legs
+```
+
 ### String
 
 Strings are immutable and can be constructed using double quotes.
@@ -268,6 +308,8 @@ Strings are immutable and can be constructed using double quotes.
   - `if x != 0 {print(x)} else {print("Zero")}`
 - [x] While loop
   - `while x > 0 {x = x - 1}`
+- [x] For loop
+  - `for i = 0; i < 10; i = i + 1 { print(i) }`
 - [x] Function definition and calling
   - `isEven = fn(n) n % 2 == 0`
 - [x] Clojures
@@ -295,9 +337,9 @@ Strings are immutable and can be constructed using double quotes.
     - Inline defitions `author = {= "name": "Maks", "age": 25}`
 - [x] Read a line from stdin
   - `a = read()`
-- [x] For loop
-  - `for i = 0; i < 10; i = i + 1 { print(i) }`
-- [ ] Return
+- [x] Return
+  - `return 12`
+  - Can also be used at the top level to terminate the program
 - [ ] Break
 - [ ] Standard library
 - [ ] Imports

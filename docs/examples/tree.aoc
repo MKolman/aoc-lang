@@ -5,10 +5,9 @@ BTreeSet = fn() {
     self.right = nil
     self.all = fn() {
         if self.value == nil {
-            []
-        } else {
-            self.left.all() + [self.value] + self.right.all()
+            return []
         }
+        self.left.all() + [self.value] + self.right.all()
     }
     self.insert = fn(value) {
         if self.value == nil {
@@ -48,14 +47,13 @@ BTreeSet = fn() {
         }
     }
     self.pop_min = fn() {
-        if self.left.value == nil {
-            # This is the smallest value in the tree
-            value = self.value
-            self._delete()
-            value
-        } else {
-            self.left.pop_min()
+        if self.left.value != nil {
+            return self.left.pop_min()
         }
+        # This is the smallest value in the tree
+        value = self.value
+        self._delete()
+        value
     }
     self._delete = fn() {
         if self.left.value == nil && self.right.value == nil {

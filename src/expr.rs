@@ -102,6 +102,7 @@ pub enum ExprType {
         idx: Vec<Expr>,
     },
     ObjectDef(Vec<(Expr, Expr)>),
+    Return(Box<Expr>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -298,6 +299,10 @@ impl Expr {
             }
             ExprType::Read => {
                 chunk.push_op(Operation::Read, self.pos);
+            }
+            ExprType::Return(expr) => {
+                chunk = expr.to_chunk(chunk);
+                chunk.push_op(Operation::Return, self.pos);
             }
             ex => todo!("{:?}", ex),
         }

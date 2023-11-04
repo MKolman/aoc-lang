@@ -83,7 +83,8 @@ impl<W: Write> Executor<W> {
                 Operation::VecSet => self.tertiary(&Self::op_vec_set),
                 Operation::VecCollect(n) => self.vec_collect(n),
                 Operation::ObjCollect(n) => self.obj_collect(n),
-                Operation::Print => self.print(),
+                Operation::Print(n) => self.print(n),
+                Operation::Read => self.read(),
                 Operation::Pop => _ = self.stack.pop(),
                 Operation::Jump(n) => self.jump(n),
                 Operation::JumpIf(n) => self.op_jump_if(n),
@@ -356,13 +357,36 @@ impl<W: Write> Executor<W> {
         self.stack.push(Value::Obj(Rc::new(RefCell::new(obj))));
     }
 
-    fn print(&mut self) {
-        let val = self.stack.last().expect("Ran out of stack");
-        if let Some(out) = &mut self.output {
-            writeln!(out, "{}", val).expect("invalid writer");
-        } else {
-            println!("{}", val);
+    fn print(&mut self, num_args: usize) {
+        let mut args = self.stack.split_off(self.stack.len() - num_args);
+        for arg in &args {
+            if let Some(out) = &mut self.output {
+                write!(out, "{arg}").expect("invalid writer");
+            } else {
+                print!("{arg}");
+            }
         }
+        let last = args.pop().unwrap_or(Value::Nil);
+        if let Some(out) = &mut self.output {
+            writeln!(out).expect("invalid writer");
+        } else {
+            println!();
+        }
+        self.stack.push(last);
+    }
+
+    fn read(&mut self) {
+        let mut input = String::new();
+        let val = match std::io::stdin().read_line(&mut input) {
+            Ok(_) if input.len() > 0 => {
+                if input.bytes().last() == Some(b'\n') {
+                    input.pop();
+                }
+                Value::Str(Rc::new(input))
+            }
+            _ => Value::Nil,
+        };
+        self.stack.push(val);
     }
 
     fn fn_call(&mut self, num_args: usize) {

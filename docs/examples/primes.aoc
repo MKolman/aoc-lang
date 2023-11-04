@@ -20,5 +20,5 @@ findPrimes = fn(n) {
     v
 }
 
-print "All the primes up to 20 are:"
-print findPrimes(20)
+print("All the primes up to 20 are:")
+print(findPrimes(20))

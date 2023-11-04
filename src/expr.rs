@@ -74,7 +74,7 @@ pub enum ExprType {
     // Scope
     Block(Vec<Expr>),
     // IO
-    Print(Box<Expr>),
+    Print(Vec<Expr>),
     Read,
     // Control flow
     If {
@@ -180,9 +180,11 @@ impl Expr {
                     chunk = expr.to_chunk(chunk);
                 }
             }
-            ExprType::Print(expr) => {
-                chunk = expr.to_chunk(chunk);
-                chunk.push_op(Operation::Print, self.pos);
+            ExprType::Print(exprs) => {
+                for expr in exprs {
+                    chunk = expr.to_chunk(chunk);
+                }
+                chunk.push_op(Operation::Print(exprs.len()), self.pos);
             }
             ExprType::If {
                 cond,
@@ -293,6 +295,9 @@ impl Expr {
                     chunk = v.to_chunk(chunk);
                 }
                 chunk.push_op(Operation::ObjCollect(fields.len()), self.pos);
+            }
+            ExprType::Read => {
+                chunk.push_op(Operation::Read, self.pos);
             }
             ex => todo!("{:?}", ex),
         }

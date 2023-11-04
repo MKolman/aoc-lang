@@ -12,7 +12,8 @@ pub enum Operation {
     Negate,
     UnaryPlus,
 
-    Print,
+    Print(usize),
+    Read,
 
     Not,
     And,

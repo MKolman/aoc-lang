@@ -23,5 +23,5 @@ sort = fn(v) {
     v
 }
 
-print "These numbers were sorted using quick sort:"
-print sort([935, 350, 195, 957, 90, 608, 181, 109, 743, 661, 601, 842, 857, 536, 640, 507, 855, 553, 412, 41])
+print("These numbers were sorted using quick sort:")
+print(sort([935, 350, 195, 957, 90, 608, 181, 109, 743, 661, 601, 842, 857, 536, 640, 507, 855, 553, 412, 41]))

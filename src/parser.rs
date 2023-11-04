@@ -160,11 +160,8 @@ impl<'a> Parser<'a> {
                 TokenType::If => self.parse_if(pos),
                 TokenType::While => self.parse_while(pos),
                 TokenType::Func => self.parse_fn_def(pos),
-                TokenType::Read => Expr::new(pos, ExprType::Read),
-                TokenType::Print => {
-                    let exp = self.parse_single();
-                    Expr::new(pos + exp.pos, ExprType::Print(Box::new(exp)))
-                }
+                TokenType::Read => self.parse_read(pos),
+                TokenType::Print => self.parse_print(pos),
                 TokenType::OBrace => self.parse_object(pos),
                 TokenType::LBrace => self.parse_block(pos),
                 TokenType::LBracket => self.parse_vec(pos),
@@ -173,6 +170,19 @@ impl<'a> Parser<'a> {
         } else {
             panic!("unexpected EOF");
         }
+    }
+
+    fn parse_print(&mut self, start_pos: Pos) -> Expr {
+        self.consume(&TokenType::LParen);
+        let args = self.parse_comma_sep_values(&TokenType::RParen);
+        let end_pos = self.consume(&TokenType::RParen);
+        Expr::new(start_pos + end_pos, ExprType::Print(args))
+    }
+
+    fn parse_read(&mut self, start_pos: Pos) -> Expr {
+        self.consume(&TokenType::LParen);
+        let end_pos = self.consume(&TokenType::RParen);
+        Expr::new(start_pos + end_pos, ExprType::Read)
     }
 
     fn parse_object(&mut self, start_pos: Pos) -> Expr {

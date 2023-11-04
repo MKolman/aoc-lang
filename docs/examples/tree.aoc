@@ -88,14 +88,14 @@ set.insert(2)
 set.insert(-2)
 set.insert(-1)
 set.insert(0)
-print set.all()
+print(set.all())
 if set.has(1) {
-    print "1 is in the set"
+    print("1 is in the set")
 }
 if !set.has(10) {
-    print "10 is not in the set"
+    print("10 is not in the set")
 }
 set.remove(1)
 if !set.has(1) {
-    print "1 is no longer in the set"
+    print("1 is no longer in the set")
 }

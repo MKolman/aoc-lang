@@ -8,6 +8,7 @@
 // Bytecode implementation
 pub mod aoc;
 pub mod bytecode;
+pub mod error;
 pub mod execute;
 pub mod expr;
 pub mod parser;

@@ -14,7 +14,14 @@ pub fn compile_and_run<W: std::io::Write>(code: &str, output: W) -> (Value, W) {
             .parse()
             .to_chunk(Chunk::default()),
     ));
-    ex.run(output)
+    match ex.run(output) {
+        Ok(value) => value,
+        Err(e) => {
+            eprintln!("{}", e);
+            eprint!("{}", e.stack_trace(code));
+            (Value::Nil, ex.output.take().unwrap())
+        }
+    }
 }
 
 #[wasm_bindgen]

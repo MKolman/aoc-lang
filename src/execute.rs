@@ -2,14 +2,18 @@ use std::{cell::RefCell, fmt::Display, io::Write, rc::Rc};
 
 use crate::{
     bytecode::Operation,
+    error::{RuntimeError, StackableResult},
     runtime::{Capture, Chunk, Value},
 };
+
+type Error = crate::error::Error<RuntimeError>;
+type Result<T> = crate::error::Result<T, RuntimeError>;
 
 pub struct Executor<W: Write> {
     chunk: Rc<Chunk>,
     stack: Vec<Value>,
     idx: usize,
-    output: Option<W>,
+    pub output: Option<W>,
     debug: bool,
 }
 
@@ -28,7 +32,7 @@ impl<W: Write> Executor<W> {
         self.debug = debug;
     }
 
-    pub fn run(&mut self, output: W) -> (Value, W) {
+    pub fn run(&mut self, output: W) -> Result<(Value, W)> {
         self.output = Some(output);
         for i in self.stack.len()..self.chunk.num_var() {
             match &self.chunk.captured_vars[i] {
@@ -44,7 +48,7 @@ impl<W: Write> Executor<W> {
                 eprintln!("{self}\n=======");
             }
             self.idx += 1;
-            match cmd {
+            let mut result = match cmd {
                 Operation::Return => break,
                 Operation::Constant(idx) => {
                     let mut val = self.chunk.get_const(idx).clone();
@@ -59,8 +63,12 @@ impl<W: Write> Executor<W> {
                         }
                     }
                     self.stack.push(val);
+                    Ok(())
                 }
-                Operation::Nil => self.stack.push(Value::Nil),
+                Operation::Nil => {
+                    self.stack.push(Value::Nil);
+                    Ok(())
+                }
                 Operation::GetVar(idx) => self.get_var(idx),
                 Operation::SetVar(idx) => self.set_var(idx),
                 Operation::Negate => self.unary(&Self::op_negate),
@@ -86,46 +94,55 @@ impl<W: Write> Executor<W> {
                 Operation::ObjCollect(n) => self.obj_collect(n),
                 Operation::Print(n) => self.print(n),
                 Operation::Read => self.read(),
-                Operation::Pop => _ = self.stack.pop(),
+                Operation::Pop => {
+                    _ = self.stack.pop();
+                    Ok(())
+                }
                 Operation::Jump(n) => self.jump(n),
                 Operation::JumpIf(n) => self.op_jump_if(n),
-                Operation::Noop => (),
+                Operation::Noop => Ok(()),
                 Operation::FnCall(n) => self.fn_call(n),
-            }
+            };
+            result.stack(self.chunk.pos[self.idx - 1]);
+            result?;
         }
-        (
+        Ok((
             self.stack.pop().expect("frame did not return a value"),
             self.output.take().unwrap(),
-        )
+        ))
     }
 
-    fn unary(&mut self, cmd: &dyn Fn(Value) -> Value) {
+    fn unary(&mut self, cmd: &dyn Fn(Value) -> Result<Value>) -> Result<()> {
         let v = self.stack.pop().expect("ran out of stack during execution");
-        self.stack.push(cmd(v));
+        self.stack.push(cmd(v)?);
+        Ok(())
     }
 
-    fn binary(&mut self, cmd: &dyn Fn(Value, Value) -> Value) {
+    fn binary(&mut self, cmd: &dyn Fn(Value, Value) -> Result<Value>) -> Result<()> {
         let right = self.stack.pop().expect("Ran out of stack during execution");
         let left = self.stack.pop().expect("Ran out of stack during execution");
-        self.stack.push(cmd(left, right));
+        self.stack.push(cmd(left, right)?);
+        Ok(())
     }
 
-    fn tertiary(&mut self, cmd: &dyn Fn(Value, Value, Value) -> Value) {
+    fn tertiary(&mut self, cmd: &dyn Fn(Value, Value, Value) -> Result<Value>) -> Result<()> {
         let right = self.stack.pop().expect("Ran out of stack during execution");
         let mid = self.stack.pop().expect("Ran out of stack during execution");
         let left = self.stack.pop().expect("Ran out of stack during execution");
-        self.stack.push(cmd(left, mid, right));
+        self.stack.push(cmd(left, mid, right)?);
+        Ok(())
     }
 
-    fn get_var(&mut self, idx: usize) {
+    fn get_var(&mut self, idx: usize) -> Result<()> {
         let val = match &self.stack[idx] {
             Value::Ref(var) => var.borrow().clone(),
             var => var.clone(),
         };
         self.stack.push(val);
+        Ok(())
     }
 
-    fn set_var(&mut self, idx: usize) {
+    fn set_var(&mut self, idx: usize) -> Result<()> {
         let val = self
             .stack
             .last()
@@ -135,11 +152,12 @@ impl<W: Write> Executor<W> {
         match &mut self.stack[idx] {
             Value::Ref(var) => *var.borrow_mut() = val,
             var => *var = val,
-        }
+        };
+        Ok(())
     }
 
-    fn op_add(left: Value, right: Value) -> Value {
-        match (left, right) {
+    fn op_add(left: Value, right: Value) -> Result<Value> {
+        let v = match (left, right) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
             (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
             (Value::Float(a), Value::Int(b)) | (Value::Int(b), Value::Float(a)) => {
@@ -152,22 +170,24 @@ impl<W: Write> Executor<W> {
                 result.extend(b.borrow().iter().cloned());
                 Value::Vec(Rc::new(RefCell::new(result)))
             }
-            (a, b) => panic!("Unsupported Add for {a} and {b}"),
-        }
+            (a, b) => return Err(format!("Unsupported Add for {a} and {b}").into()),
+        };
+        Ok(v)
     }
 
-    fn op_sub(left: Value, right: Value) -> Value {
-        match (left, right) {
+    fn op_sub(left: Value, right: Value) -> Result<Value> {
+        let v = match (left, right) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
             (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
             (Value::Float(a), Value::Int(b)) => Value::Float(a - b as f64),
             (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 - b),
-            (a, b) => panic!("Unsupported Sub for {a} and {b}"),
-        }
+            (a, b) => return Err(format!("Unsupported Sub for {a} and {b}").into()),
+        };
+        Ok(v)
     }
 
-    fn op_mul(left: Value, right: Value) -> Value {
-        match (left, right) {
+    fn op_mul(left: Value, right: Value) -> Result<Value> {
+        let v = match (left, right) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
             (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
             (Value::Float(a), Value::Int(b)) | (Value::Int(b), Value::Float(a)) => {
@@ -176,179 +196,191 @@ impl<W: Write> Executor<W> {
             (Value::Str(a), Value::Int(b)) | (Value::Int(b), Value::Str(a)) => {
                 Value::Str(Rc::new(a.repeat(b as usize)))
             }
-            (a, b) => panic!("Unsupported Mul for {:?} and {:?}", a, b),
-        }
+            (a, b) => return Err(format!("Unsupported Mul for {a} and {b}").into()),
+        };
+        Ok(v)
     }
 
-    fn op_div(left: Value, right: Value) -> Value {
-        match (left, right) {
-            (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
-            (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
-            (Value::Float(a), Value::Int(b)) => Value::Float(a / b as f64),
-            (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 / b),
-            (a, b) => panic!("Unsupported Div for {:?} and {:?}", a, b),
-        }
+    fn op_div(left: Value, right: Value) -> Result<Value> {
+        let v = match (left, right) {
+            (Value::Int(a), Value::Int(b)) if b != 0 => Value::Int(a / b),
+            (Value::Float(a), Value::Float(b)) if b != 0.0 => Value::Float(a / b),
+            (Value::Float(a), Value::Int(b)) if b != 0 => Value::Float(a / b as f64),
+            (Value::Int(a), Value::Float(b)) if b != 0.0 => Value::Float(a as f64 / b),
+            (a, b) => return Err(format!("Unsupported Div for {a} and {b}").into()),
+        };
+        Ok(v)
     }
 
-    fn op_mod(left: Value, right: Value) -> Value {
-        match (left, right) {
-            (Value::Int(a), Value::Int(b)) => Value::Int(a % b),
-            (Value::Float(a), Value::Float(b)) => Value::Float(a % b),
-            (Value::Float(a), Value::Int(b)) => Value::Float(a % b as f64),
-            (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 % b),
-            (a, b) => panic!("Unsupported Mod for {:?} and {:?}", a, b),
-        }
+    fn op_mod(left: Value, right: Value) -> Result<Value> {
+        let v = match (left, right) {
+            (Value::Int(a), Value::Int(b)) if b != 0 => Value::Int(a % b),
+            (Value::Float(a), Value::Float(b)) if b != 0. => Value::Float(a % b),
+            (Value::Float(a), Value::Int(b)) if b != 0 => Value::Float(a % b as f64),
+            (Value::Int(a), Value::Float(b)) if b != 0. => Value::Float(a as f64 % b),
+            (a, b) => return Err(format!("Unsupported Mod for {a} and {b}").into()),
+        };
+        Ok(v)
     }
 
-    fn op_not(v: Value) -> Value {
+    fn op_not(v: Value) -> Result<Value> {
         match v.truthy() {
-            true => Value::Int(0),
-            false => Value::Int(1),
+            true => Ok(Value::Int(0)),
+            false => Ok(Value::Int(1)),
         }
     }
 
-    fn op_negate(v: Value) -> Value {
+    fn op_negate(v: Value) -> Result<Value> {
         match v {
-            Value::Int(i) => Value::Int(-i),
-            Value::Float(f) => Value::Float(-f),
-            v => panic!("Cannot negate {}", v),
+            Value::Int(i) => Ok(Value::Int(-i)),
+            Value::Float(f) => Ok(Value::Float(-f)),
+            v => Err(format!("Cannot negate {v}").into()),
         }
     }
 
-    fn op_unary_plus(v: Value) -> Value {
+    fn op_unary_plus(v: Value) -> Result<Value> {
         match v {
-            Value::Int(_) | Value::Float(_) => v,
-            Value::Vec(v) => Value::Int(v.borrow().len() as i64),
-            Value::Str(s) => Value::Int(s.len() as i64),
-            v => panic!("Unary + invalid for {}", v),
+            Value::Int(_) | Value::Float(_) => Ok(v),
+            Value::Vec(v) => Ok(Value::Int(v.borrow().len() as i64)),
+            Value::Str(s) => Ok(Value::Int(s.len() as i64)),
+            v => Err(format!("Unary + invalid for {v}").into()),
         }
     }
 
-    fn op_and(left: Value, right: Value) -> Value {
+    fn op_and(left: Value, right: Value) -> Result<Value> {
         if !left.truthy() {
-            left
+            Ok(left)
         } else {
-            right
+            Ok(right)
         }
     }
 
-    fn op_or(left: Value, right: Value) -> Value {
+    fn op_or(left: Value, right: Value) -> Result<Value> {
         if left.truthy() {
-            left
+            Ok(left)
         } else {
-            right
+            Ok(right)
         }
     }
 
-    fn op_eq(left: Value, right: Value) -> Value {
+    fn op_eq(left: Value, right: Value) -> Result<Value> {
         if left == right {
-            Value::Int(1)
+            Ok(Value::Int(1))
         } else {
-            Value::Int(0)
+            Ok(Value::Int(0))
         }
     }
 
-    fn op_neq(left: Value, right: Value) -> Value {
-        Self::op_not(Self::op_eq(left, right))
+    fn op_neq(left: Value, right: Value) -> Result<Value> {
+        Self::op_not(Self::op_eq(left, right)?)
     }
 
-    fn op_jump_if(&mut self, n: i64) {
+    fn op_jump_if(&mut self, n: i64) -> Result<()> {
         if !self.stack.pop().expect("Ran out of stack").truthy() {
-            self.jump(n);
+            self.jump(n)?;
         }
+        Ok(())
     }
 
-    fn jump(&mut self, n: i64) {
+    fn jump(&mut self, n: i64) -> Result<()> {
         if n > 0 {
             self.idx += n as usize;
         } else {
             self.idx -= (-n) as usize;
         }
+        Ok(())
     }
 
-    fn op_gt(left: Value, right: Value) -> Value {
-        match (left, right) {
+    fn op_gt(left: Value, right: Value) -> Result<Value> {
+        let v = match (left, right) {
             (Value::Int(a), Value::Int(b)) => Value::Int((a > b) as i64),
             (Value::Float(a), Value::Float(b)) => Value::Int((a > b) as i64),
             (Value::Float(a), Value::Int(b)) => Value::Int((a > b as f64) as i64),
             (Value::Int(a), Value::Float(b)) => Value::Int((a as f64 > b) as i64),
-            (a, b) => panic!("Unsupported Gt for {:?} and {:?}", a, b),
-        }
+            (a, b) => return Err(format!("Unsupported Gt for {:?} and {:?}", a, b).into()),
+        };
+        Ok(v)
     }
 
-    fn op_geq(left: Value, right: Value) -> Value {
+    fn op_geq(left: Value, right: Value) -> Result<Value> {
         Self::op_or(
-            Self::op_eq(left.clone(), right.clone()),
-            Self::op_gt(left, right),
+            Self::op_eq(left.clone(), right.clone())?,
+            Self::op_gt(left, right)?,
         )
     }
 
-    fn op_lt(left: Value, right: Value) -> Value {
-        Self::op_not(Self::op_geq(left, right))
+    fn op_lt(left: Value, right: Value) -> Result<Value> {
+        Self::op_not(Self::op_geq(left, right)?)
     }
 
-    fn op_leq(left: Value, right: Value) -> Value {
-        Self::op_not(Self::op_gt(left, right))
+    fn op_leq(left: Value, right: Value) -> Result<Value> {
+        Self::op_not(Self::op_gt(left, right)?)
     }
-    fn op_vec_get(index: Value, vec: Value) -> Value {
+    fn op_vec_get(index: Value, vec: Value) -> Result<Value> {
         match (vec, index) {
             (Value::Vec(v), Value::Int(i)) => {
                 let v = v.borrow();
-                v.get(wrap_vec_idx(i, v.len()))
-                    .expect("Index out of range")
-                    .clone()
+                let val = v.get(wrap_vec_idx(i, v.len())).ok_or::<Error>(
+                    format!("Index {i} out of range for vector of length {}", v.len()).into(),
+                )?;
+                Ok(val.clone())
             }
-            (Value::Str(s), Value::Int(i)) => Value::Int(
-                *s.as_bytes()
-                    .get(wrap_vec_idx(i, s.len()))
-                    .expect("String index out of range") as i64,
-            ),
-            (Value::Obj(o), v) => o.borrow().get(&v).unwrap_or(&Value::Nil).clone(),
+            (Value::Str(s), Value::Int(i)) => Ok(Value::Int(
+                *s.as_bytes().get(wrap_vec_idx(i, s.len())).ok_or::<Error>(
+                    format!(
+                        "String index {i} out of range for string of length {}",
+                        s.len()
+                    )
+                    .into(),
+                )? as i64,
+            )),
+            (Value::Obj(o), v) => Ok(o.borrow().get(&v).unwrap_or(&Value::Nil).clone()),
             (a, b) => panic!("Unsupported VecGet for {}[{}]", a, b),
         }
     }
-    fn op_vec_slice(start_idx: Value, end_idx: Value, vec: Value) -> Value {
+    fn op_vec_slice(start_idx: Value, end_idx: Value, vec: Value) -> Result<Value> {
         match (vec, start_idx, end_idx) {
             (Value::Vec(v), Value::Int(s), Value::Int(e)) => {
                 let v = v.borrow();
                 let s = wrap_vec_idx(s, v.len());
                 let e = wrap_vec_idx(e, v.len());
-                Value::Vec(Rc::new(RefCell::new(
+                Ok(Value::Vec(Rc::new(RefCell::new(
                     v[s..e].into_iter().cloned().collect(),
-                )))
+                ))))
             }
             (Value::Str(st), Value::Int(s), Value::Int(e)) => {
                 let s = wrap_vec_idx(s, st.len());
                 let e = wrap_vec_idx(e, st.len());
-                Value::Str(Rc::new(st[s..e].to_string()))
+                Ok(Value::Str(Rc::new(st[s..e].to_string())))
             }
-            (a, b, c) => panic!("Unsupported VecGet for {a}[{b},{c}]"),
+            (a, b, c) => Err(format!("Unsupported VecGet for {a}[{b},{c}]").into()),
         }
     }
-    fn op_vec_set(vec: Value, index: Value, value: Value) -> Value {
+    fn op_vec_set(vec: Value, index: Value, value: Value) -> Result<Value> {
         match (vec, index) {
             (Value::Vec(v), Value::Int(i)) => {
                 let mut val = v.borrow_mut();
                 let i = wrap_vec_idx(i, val.len());
                 val[i] = value.clone();
-                value
+                Ok(value)
             }
             (Value::Obj(o), index) => {
                 o.borrow_mut().insert(index, value.clone());
-                value
+                Ok(value)
             }
-            (a, b) => panic!("Unsupported VecSet for {:?}[{:?}]", a, b),
+            (a, b) => Err(format!("Unsupported VecSet for {a}[{b}]").into()),
         }
     }
-    fn vec_collect(&mut self, size: usize) {
+    fn vec_collect(&mut self, size: usize) -> Result<()> {
         let mut vec = Vec::with_capacity(size);
         for _ in 0..size {
             vec.push(self.stack.pop().expect("Ran out of stack"));
         }
         self.stack.push(Value::Vec(Rc::new(RefCell::new(vec))));
+        Ok(())
     }
 
-    fn obj_collect(&mut self, size: usize) {
+    fn obj_collect(&mut self, size: usize) -> Result<()> {
         let mut obj = std::collections::HashMap::with_capacity(size);
         for _ in 0..size {
             let val = self.stack.pop().expect("Ran out of stack");
@@ -356,13 +388,14 @@ impl<W: Write> Executor<W> {
             obj.insert(key, val);
         }
         self.stack.push(Value::Obj(Rc::new(RefCell::new(obj))));
+        Ok(())
     }
 
-    fn print(&mut self, num_args: usize) {
+    fn print(&mut self, num_args: usize) -> Result<()> {
         let mut args = self.stack.split_off(self.stack.len() - num_args);
         for arg in &args {
             if let Some(out) = &mut self.output {
-                write!(out, "{arg}").expect("invalid writer");
+                write!(out, "{arg}").map_err(Error::from)?;
             } else {
                 print!("{arg}");
             }
@@ -374,9 +407,10 @@ impl<W: Write> Executor<W> {
             println!();
         }
         self.stack.push(last);
+        Ok(())
     }
 
-    fn read(&mut self) {
+    fn read(&mut self) -> Result<()> {
         let mut input = String::new();
         let val = match std::io::stdin().read_line(&mut input) {
             Ok(_) if input.len() > 0 => {
@@ -388,9 +422,10 @@ impl<W: Write> Executor<W> {
             _ => Value::Nil,
         };
         self.stack.push(val);
+        Ok(())
     }
 
-    fn fn_call(&mut self, num_args: usize) {
+    fn fn_call(&mut self, num_args: usize) -> Result<()> {
         let func = self.stack.pop().expect("Ran out of stack.");
         let Value::Fn {
             num_params,
@@ -428,9 +463,17 @@ impl<W: Write> Executor<W> {
         if self.debug {
             eprintln!(" ==== Calling function:\n{}\n ======", executor);
         }
-        let (val, output) = executor.run(self.output.take().unwrap());
-        self.stack.push(val);
-        self.output = Some(output);
+        match executor.run(self.output.take().unwrap()) {
+            Ok((val, output)) => {
+                self.output = Some(output);
+                self.stack.push(val);
+                Ok(())
+            }
+            Err(e) => {
+                self.output = Some(executor.output.take().unwrap());
+                Err(e)
+            }
+        }
     }
 }
 
@@ -493,6 +536,6 @@ mod test {
         let mut ex = Executor::new(Rc::new(chunk));
         let val = ex.run(Vec::new());
         assert_eq!(ex.stack.len(), 0);
-        assert_eq!(val, (Value::Int(3), Vec::new()));
+        assert_eq!(val.unwrap(), (Value::Int(3), Vec::new()));
     }
 }

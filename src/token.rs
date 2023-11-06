@@ -4,13 +4,32 @@ use crate::expr::Operator;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Pos {
-    start: usize,
-    end: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
+pub struct Snippet<'s> {
+    pub line: usize,
+    pub col: usize,
+    pub line_prefix: &'s str,
+    pub snippet: &'s str,
+    pub line_suffix: &'s str,
 }
 
 impl Pos {
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
+    }
+    pub fn extract<'c>(&self, code: &'c str) -> Snippet<'c> {
+        let line_start = code[..self.start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_end = code[self.end..].find('\n').unwrap_or(code.len() - self.end) + self.end;
+        Snippet {
+            line: code[..self.start].matches('\n').count() + 1,
+            col: self.start - line_start,
+            line_prefix: &code[line_start..self.start],
+            snippet: &code[self.start..self.end],
+            line_suffix: &code[self.end..line_end],
+        }
     }
 }
 

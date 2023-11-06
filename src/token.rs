@@ -25,7 +25,7 @@ impl Pos {
         let line_end = code[self.end..].find('\n').unwrap_or(code.len() - self.end) + self.end;
         Snippet {
             line: code[..self.start].matches('\n').count() + 1,
-            col: self.start - line_start,
+            col: self.start + 1 - line_start,
             line_prefix: &code[line_start..self.start],
             snippet: &code[self.start..self.end],
             line_suffix: &code[self.end..line_end],

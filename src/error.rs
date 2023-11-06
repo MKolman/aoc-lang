@@ -38,6 +38,9 @@ impl Kind for SyntaxError {}
 #[derive(Debug, Default)]
 pub struct RuntimeError;
 impl Kind for RuntimeError {}
+#[derive(Debug, Default)]
+pub struct ParserError;
+impl Kind for ParserError {}
 
 #[derive(Debug)]
 pub struct Error<E: Kind> {
@@ -64,6 +67,16 @@ impl<E: Kind> Error<E> {
             stack: Vec::new(),
         }
     }
+
+    pub fn build(context: String, pos: Pos) -> Self {
+        Self {
+            underlying: None,
+            kind: E::default(),
+            context,
+            stack: vec![pos],
+        }
+    }
+
     pub fn stack(&mut self, pos: Pos) -> &mut Self {
         self.stack.push(pos);
         self

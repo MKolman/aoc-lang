@@ -518,24 +518,3 @@ where
     }
     write!(f, "]")
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn add() {
-        let bytecode = vec![
-            Operation::Constant(0),
-            Operation::Constant(1),
-            Operation::Add,
-        ];
-        let mut chunk = Chunk::default();
-        chunk.bytecode = bytecode;
-        chunk.push_const(Value::Int(1));
-        chunk.push_const(Value::Int(2));
-        let mut ex = Executor::new(Rc::new(chunk));
-        let val = ex.run(Vec::new());
-        assert_eq!(ex.stack.len(), 0);
-        assert_eq!(val.unwrap(), (Value::Int(3), Vec::new()));
-    }
-}

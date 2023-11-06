@@ -340,6 +340,7 @@ Strings are immutable and can be constructed using double quotes.
 - [x] Return
   - `return 12`
   - Can also be used at the top level to terminate the program
+- [x] Error reporting during parsing, compilation and runtime
 - [ ] Break
 - [ ] Standard library
 - [ ] Imports

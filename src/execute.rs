@@ -436,14 +436,8 @@ impl<W: Write> Executor<W> {
 
 fn wrap_vec_idx(idx: i64, len: usize) -> usize {
     if idx < 0 {
-        if (-idx) as usize > len {
-            panic!("Index out of range");
-        }
         len - (-idx) as usize
     } else {
-        if idx as usize >= len {
-            panic!("Index out of range");
-        }
         idx as usize
     }
 }

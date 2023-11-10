@@ -196,6 +196,14 @@ impl<W: Write> Executor<W> {
             (Value::Str(a), Value::Int(b)) | (Value::Int(b), Value::Str(a)) => {
                 Value::Str(Rc::new(a.repeat(b as usize)))
             }
+            (Value::Vec(v), Value::Int(n)) | (Value::Int(n), Value::Vec(v)) => {
+                let v = v.borrow();
+                let mut result = Vec::with_capacity(v.len() * n as usize);
+                for _ in 0..n {
+                    result.extend(v.iter().cloned());
+                }
+                Value::Vec(Rc::new(RefCell::new(result)))
+            }
             (a, b) => return Err(format!("Unsupported Mul for {a} and {b}").into()),
         };
         Ok(v)

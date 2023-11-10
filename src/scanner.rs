@@ -2,6 +2,7 @@ use std::{iter::Peekable, str::CharIndices};
 
 use crate::token::{Token, TokenType};
 
+#[derive(Debug, Clone)]
 pub struct Scanner<'a> {
     input: &'a str,
     iter: Peekable<CharIndices<'a>>,
@@ -72,18 +73,14 @@ impl<'a> Scanner<'a> {
     }
 
     fn comment(&mut self) -> Token {
-        let &(start, mut last) = self.iter.peek().expect("Needs one character");
+        let (start, mut last) = self.iter.next().expect("Needs one character");
         let mut end = 0;
-
+        let mut comment = last.to_string();
         while matches!(self.iter.peek(), Some(&(_, c)) if c != '\n') {
             (end, last) = self.iter.next().expect("peek() was Some");
+            comment.push(last);
         }
-        end += last.len_utf8();
-        Token::new(
-            start,
-            end,
-            TokenType::Comment(self.input[start..end].to_string()),
-        )
+        Token::new(start, end, TokenType::Comment(comment))
     }
 
     fn keyword_or_identifier(&mut self) -> Token {

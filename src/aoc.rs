@@ -10,7 +10,8 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 pub fn compile_and_run<W: std::io::Write>(code: &str, output: W) -> (Value, W) {
-    let expr = match Parser::new(Scanner::new(code)).parse() {
+    let tokens = Scanner::new(code);
+    let expr = match Parser::new(tokens).parse() {
         Ok(expr) => expr,
         Err(e) => {
             let mut output = output;

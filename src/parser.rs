@@ -21,15 +21,13 @@ impl<'a> Parser<'a> {
 
     pub fn parse(&mut self) -> Result<Expr> {
         let mut result = Vec::new();
+        self.skip_whitespace();
         while let Some(token) = self.tokens.peek() {
             match token.kind {
-                TokenType::EOL => {
-                    self.tokens.next();
-                    continue;
-                }
                 TokenType::EOF => break,
                 _ => result.push(self.parse_single()?),
             }
+            self.skip_whitespace();
         }
         if result.len() == 0 {
             result.push(Expr::new(Pos::new(0, 0), ExprType::Nil));
@@ -42,21 +40,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_single(&mut self) -> Result<Expr> {
-        loop {
-            if self.try_consume(&TokenType::EOL).is_some() {
-                continue;
-            }
-            if let Some(Token {
-                pos: _,
-                kind: TokenType::Comment(_),
-            }) = self.tokens.peek()
-            {
-                self.tokens.next();
-                continue;
-            }
-            break;
-        }
-        self.parse_assignment()
+        self.skip_whitespace();
+        let result = self.parse_assignment()?;
+        self.skip_whitespace();
+        Ok(result)
     }
 
     fn parse_assignment(&mut self) -> Result<Expr> {
@@ -180,7 +167,7 @@ impl<'a> Parser<'a> {
                 TokenType::LBrace => self.parse_block(pos),
                 TokenType::LBracket => self.parse_vec(pos),
                 TokenType::Return => self.parse_return(pos),
-                t => Err(Error::build(format!("Unexpected token {t:?}"), pos)),
+                t => panic!("Unexpected token {t:?}"), // t => Err(Error::build(format!("Unexpected token {t:?}"), pos)),
             }
         } else {
             Err(format!("Unexpected EOF while parsing").into())
@@ -243,12 +230,13 @@ impl<'a> Parser<'a> {
 
     fn parse_comma_sep_values(&mut self, terminator: &TokenType) -> Result<Vec<Expr>> {
         let mut args = Vec::new();
+        self.skip_whitespace();
         while !self.check(terminator) {
             args.push(self.parse_single()?);
             if self.try_consume(&TokenType::Comma).is_none() {
                 break;
             }
-            while self.try_consume(&TokenType::EOL).is_some() {}
+            self.skip_whitespace();
         }
         Ok(args)
     }
@@ -261,11 +249,10 @@ impl<'a> Parser<'a> {
 
     fn parse_block(&mut self, pos: Pos) -> Result<Expr> {
         let mut result = Vec::new();
+        self.skip_whitespace();
         while !self.check(&TokenType::RBrace) {
-            if self.try_consume(&TokenType::EOL).is_some() {
-                continue;
-            }
             result.push(self.parse_single()?);
+            self.skip_whitespace();
         }
         let end_pos = self.consume(&TokenType::RBrace)?;
         Ok(Expr::new(pos + end_pos, ExprType::Block(result)))
@@ -327,6 +314,23 @@ impl<'a> Parser<'a> {
             start_pos + result.pos,
             ExprType::Return(Box::new(result)),
         ))
+    }
+
+    fn skip_whitespace(&mut self) {
+        loop {
+            if self.try_consume(&TokenType::EOL).is_some() {
+                continue;
+            }
+            if let Some(Token {
+                pos: _,
+                kind: TokenType::Comment(_),
+            }) = self.tokens.peek()
+            {
+                self.tokens.next();
+                continue;
+            }
+            break;
+        }
     }
 
     fn try_consume_operator(&mut self, ops: Option<&HashSet<Operator>>) -> Option<(Pos, Operator)> {

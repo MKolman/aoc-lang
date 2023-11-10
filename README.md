@@ -286,12 +286,25 @@ fox.walk()
 
 ### String
 
-Strings are immutable and can be constructed using double quotes.
+Strings are immutable and can be constructed using double quotes. You can use the square brackets to access individual characters or slices of the string.
 
 ```
 > a = "Hello World"
 > print(a)
 | Hello World
+> print(a[0, 5])
+| Hello
+```
+
+NOTE: Characters are not a new type they're just integer numbers equivalent to charaters ascii
+value and can be accessed in string using the square brackets or constructed using single quotes `'`.
+
+```
+> a = "123"
+> print(a[0])
+| 49
+print('A')
+| 65
 ```
 
 ## Language TODO list

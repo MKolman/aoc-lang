@@ -47,6 +47,7 @@ impl<'a> Scanner<'a> {
                 '0'..='9' => self.number(),
                 '#' => self.comment(),
                 '"' => self.string(),
+                '\'' => self.char(),
                 ' ' | '\t' => {
                     self.iter.next().expect("");
                     continue;
@@ -139,6 +140,13 @@ impl<'a> Scanner<'a> {
         }
         let (end, _) = self.iter.next().expect("Strings end with '\"'");
         Token::new(start, end, TokenType::String(res))
+    }
+
+    fn char(&mut self) -> Token {
+        let (start, _) = self.iter.next().expect("Chars start with '\''");
+        let (_, c) = self.iter.next().expect("EOF while reading a character");
+        let (end, _) = self.iter.next().expect("Chars end with '\''");
+        Token::new(start, end, TokenType::Integer(c as i64))
     }
 }
 

@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Display, io::Write, rc::Rc};
 
 use crate::{
     bytecode::Operation,
-    error::{RuntimeError, StackableResult},
+    error::{RuntimeError, Stackable},
     runtime::{Capture, Chunk, Value},
 };
 
@@ -48,7 +48,7 @@ impl<W: Write> Executor<W> {
                 eprintln!("{self}\n=======");
             }
             self.idx += 1;
-            let mut result = match cmd {
+            let result = match cmd {
                 Operation::Return => break,
                 Operation::Constant(idx) => {
                     let mut val = self.chunk.get_const(idx).clone();
@@ -103,8 +103,7 @@ impl<W: Write> Executor<W> {
                 Operation::Noop => Ok(()),
                 Operation::FnCall(n) => self.fn_call(n),
             };
-            result.stack(self.chunk.pos[self.idx - 1]);
-            result?;
+            result.stack(self.chunk.pos[self.idx - 1])?;
         }
         Ok((
             self.stack.pop().expect("frame did not return a value"),

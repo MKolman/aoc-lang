@@ -363,6 +363,7 @@ print('A')
   - `return 12`
   - Can also be used at the top level to terminate the program
 - [x] Error reporting during parsing, compilation and runtime
+- [x] Imports
+  - `use "path/to/file.aoc"`
 - [ ] Break
 - [ ] Standard library
-- [ ] Imports

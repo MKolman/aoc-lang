@@ -4,29 +4,23 @@ use crate::token::Pos;
 
 pub type Result<T, E> = std::result::Result<T, Error<E>>;
 
-pub trait StackableResult {
-    fn stack(&mut self, pos: Pos) -> &mut Self;
-    fn context(&mut self, context: &str) -> &mut Self;
+pub trait Stackable {
+    fn stack(self, pos: Pos) -> Self;
+    fn context(self, context: &str) -> Self;
+    fn wrap(self, context: &str, pos: Pos) -> Self
+    where
+        Self: Sized,
+    {
+        self.stack(pos).context(context)
+    }
 }
 
-impl<T, E: Kind> StackableResult for Result<T, E> {
-    fn stack(&mut self, pos: Pos) -> &mut Self {
-        match self {
-            Ok(_) => {}
-            Err(e) => {
-                e.stack(pos);
-            }
-        };
-        self
+impl<T, E: Stackable> Stackable for std::result::Result<T, E> {
+    fn stack(self, pos: Pos) -> Self {
+        self.map_err(|e| e.stack(pos))
     }
-    fn context(&mut self, context: &str) -> &mut Self {
-        match self {
-            Ok(_) => {}
-            Err(e) => {
-                e.context(context);
-            }
-        };
-        self
+    fn context(self, context: &str) -> Self {
+        self.map_err(|e| e.context(context))
     }
 }
 
@@ -77,14 +71,6 @@ impl<E: Kind> Error<E> {
         }
     }
 
-    pub fn stack(&mut self, pos: Pos) -> &mut Self {
-        self.stack.push(pos);
-        self
-    }
-    pub fn context(&mut self, context: &str) -> &mut Self {
-        self.context = format!("{}: {}", context, self.context);
-        self
-    }
     pub fn stack_trace(&self, code: &str) -> String {
         let mut result = String::new();
         for pos in &self.stack {
@@ -102,7 +88,16 @@ impl<E: Kind> Error<E> {
         result
     }
 }
-
+impl<T: Kind> Stackable for Error<T> {
+    fn stack(mut self, pos: Pos) -> Self {
+        self.stack.push(pos);
+        self
+    }
+    fn context(mut self, context: &str) -> Self {
+        self.context = format!("{}: {}", context, self.context);
+        self
+    }
+}
 impl<T: Kind> From<String> for Error<T> {
     fn from(context: String) -> Self {
         Self::new(context)

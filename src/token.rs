@@ -57,6 +57,7 @@ pub enum TokenType {
     Read,
     While,
     Func,
+    Use,
     // Parenthesis
     LParen,
     RParen,
@@ -108,6 +109,7 @@ impl TokenType {
             "fn" => Self::Func,
             "nil" => Self::Nil,
             "return" => Self::Return,
+            "use" => Self::Use,
             v => Self::Identifier(v.to_string()),
         }
     }

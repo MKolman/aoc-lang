@@ -167,6 +167,7 @@ impl<'a> Parser<'a> {
                 TokenType::LBrace => self.parse_block(pos),
                 TokenType::LBracket => self.parse_vec(pos),
                 TokenType::Return => self.parse_return(pos),
+                TokenType::Use => self.parse_use(pos),
                 t => panic!("Unexpected token {t:?}"), // t => Err(Error::build(format!("Unexpected token {t:?}"), pos)),
             }
         } else {
@@ -314,6 +315,20 @@ impl<'a> Parser<'a> {
             start_pos + result.pos,
             ExprType::Return(Box::new(result)),
         ))
+    }
+
+    fn parse_use(&mut self, start_pos: Pos) -> Result<Expr> {
+        let Token {
+            pos,
+            kind: TokenType::String(filename),
+        } = self.tokens.next().expect("EOF after use")
+        else {
+            return Err(Error::build(
+                "Expected a string literal after use not".into(),
+                start_pos,
+            ));
+        };
+        Ok(Expr::new(start_pos + pos, ExprType::Use(filename)))
     }
 
     fn skip_whitespace(&mut self) {

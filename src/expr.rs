@@ -2,8 +2,10 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::bytecode::Operation;
+use crate::error::Stackable;
 use crate::runtime::{Chunk, Value};
 use crate::token::Pos;
+use crate::{parser, scanner};
 
 type Error = crate::error::Error<crate::error::SyntaxError>;
 type Result<T> = crate::error::Result<T, crate::error::SyntaxError>;
@@ -105,6 +107,7 @@ pub enum ExprType {
         idx: Vec<Expr>,
     },
     ObjectDef(Vec<(Expr, Expr)>),
+    Use(String),
     Return(Box<Expr>),
 }
 
@@ -310,15 +313,34 @@ impl Expr {
                 chunk = expr.to_chunk(chunk)?;
                 chunk.push_op(Operation::Return, self.pos);
             }
+            ExprType::Use(filename) => {
+                let code = std::fs::read_to_string(filename)
+                    .map_err(Error::from)
+                    .wrap(&format!("cannot open imported file {filename}"), self.pos)?;
+                let tokens = scanner::Scanner::new(&code);
+                let expr = parser::Parser::new(tokens)
+                    .parse()
+                    .map_err(Error::from)
+                    .wrap(&format!("cannot parse imported file {filename}"), self.pos)?;
+                let use_chunk = expr.to_chunk(Chunk::default()).wrap(
+                    &format!("could not compile imported file {filename}"),
+                    self.pos,
+                )?;
+                let const_idx = chunk.push_const(Value::Fn {
+                    num_params: 0,
+                    captured: Vec::new(),
+                    chunk: Rc::new(use_chunk),
+                });
+                chunk.push_op(Operation::Constant(const_idx), self.pos);
+                chunk.push_op(Operation::FnCall(0), self.pos);
+            }
             ex => return Err(self.err(format!("Unimplemented expression {ex:?}"))),
         }
 
         Ok(chunk)
     }
     fn err(&self, msg: String) -> Error {
-        let mut e = Error::new(msg);
-        e.stack(self.pos);
-        e
+        Error::new(msg).stack(self.pos)
     }
 }
 

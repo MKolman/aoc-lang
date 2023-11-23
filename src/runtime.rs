@@ -4,6 +4,7 @@ use std::hash::Hash;
 use std::rc::Rc;
 use std::{collections::HashMap, ops::AddAssign};
 
+use crate::error::{self, Stackable};
 use crate::{bytecode::Operation, token::Pos};
 
 #[derive(Debug, Clone)]
@@ -247,18 +248,30 @@ impl Chunk {
         idx
     }
 
-    pub fn jump_from(&mut self, from: usize) -> bool {
+    pub fn jump_from(&mut self, from: usize) -> error::Result<(), error::SyntaxError> {
         let idx = self.bytecode.len();
         if from >= idx {
-            return false;
+            return Err(error::Error::build(
+                "Jumping from a non-existent instruction!".into(),
+                self.pos[idx - 1],
+            ));
         }
 
         match &mut self.bytecode[from] {
             Operation::Jump(v) | Operation::JumpIf(v) => {
-                *v = (idx - from - 1) as i64;
-                true
+                let tmp = idx - from - 1;
+                *v = tmp.try_into().map_err(|e| {
+                    error::Error::from(e).wrap(
+                        &format!("Trying to jump {tmp} instructions which does not fit into i8"),
+                        self.pos[from],
+                    )
+                })?;
+                Ok(())
             }
-            _ => false,
+            _ => Err(error::Error::build(
+                "Jumping from a non-jump instruction!".into(),
+                self.pos[from],
+            )),
         }
     }
 }

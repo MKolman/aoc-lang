@@ -127,18 +127,9 @@ impl Expr {
             ExprType::Nil => {
                 chunk.push_op(Operation::Nil, self.pos);
             }
-            ExprType::Int(v) => {
-                let idx = chunk.push_const(Value::Int(*v));
-                chunk.push_op(Operation::Constant(idx), self.pos);
-            }
-            ExprType::Float(v) => {
-                let idx = chunk.push_const(Value::Float(*v));
-                chunk.push_op(Operation::Constant(idx), self.pos);
-            }
-            ExprType::Str(v) => {
-                let idx = chunk.push_const(Value::Str(v.clone()));
-                chunk.push_op(Operation::Constant(idx), self.pos);
-            }
+            ExprType::Int(v) => self.constant(&mut chunk, Value::Int(*v))?,
+            ExprType::Float(v) => self.constant(&mut chunk, Value::Float(*v))?,
+            ExprType::Str(v) => self.constant(&mut chunk, Value::Str(v.clone()))?,
             ExprType::BinaryOp { op, left, right } => {
                 chunk = left.to_chunk(chunk)?;
                 chunk = right.to_chunk(chunk)?;
@@ -191,7 +182,10 @@ impl Expr {
                 for expr in exprs {
                     chunk = expr.to_chunk(chunk)?;
                 }
-                chunk.push_op(Operation::Print(exprs.len()), self.pos);
+                chunk.push_op(
+                    Operation::Print(self.to_u8(exprs.len(), "Printing more than 255 values")?),
+                    self.pos,
+                );
             }
             ExprType::If {
                 cond,
@@ -202,13 +196,13 @@ impl Expr {
                 let jump_if_idx = chunk.push_op(Operation::JumpIf(0), self.pos);
                 chunk = body.to_chunk(chunk)?;
                 let jump_idx = chunk.push_op(Operation::Jump(0), self.pos);
-                chunk.jump_from(jump_if_idx);
+                chunk.jump_from(jump_if_idx)?;
                 if let Some(elsebody) = elsebody {
                     chunk = elsebody.to_chunk(chunk)?;
                 } else {
                     chunk.push_op(Operation::Nil, self.pos);
                 }
-                chunk.jump_from(jump_idx);
+                chunk.jump_from(jump_idx)?;
             }
             ExprType::While { cond, body } => {
                 chunk.push_op(Operation::Nil, self.pos);
@@ -218,16 +212,26 @@ impl Expr {
                 chunk.push_op(Operation::Pop, self.pos);
                 chunk = body.to_chunk(chunk)?;
                 chunk.push_op(
-                    Operation::Jump(start_idx - 1 - chunk.num_bytecode() as i64),
+                    Operation::Jump(
+                        (start_idx - 1 - chunk.num_bytecode() as i64)
+                            .try_into()
+                            .map_err(Error::from)
+                            .wrap("Loop body longer than 255 bytecode", self.pos)?,
+                    ),
                     self.pos,
                 );
-                chunk.jump_from(jump_if_idx);
+                chunk.jump_from(jump_if_idx)?;
             }
             ExprType::Assign { left, right } => match &left.kind {
                 ExprType::Identifier(var) => {
                     let idx = chunk.get_var(var);
                     chunk = right.to_chunk(chunk)?;
-                    chunk.push_op(Operation::SetVar(idx), self.pos);
+                    chunk.push_op(
+                        Operation::SetVar(
+                            self.to_u8(idx, "More than 255 variables in local scope")?,
+                        ),
+                        self.pos,
+                    );
                 }
                 ExprType::VecGet { vec, idx } if idx.len() == 1 => {
                     chunk = vec.to_chunk(chunk)?;
@@ -246,14 +250,22 @@ impl Expr {
                 let idx = chunk
                     .lookup_var(var, false)
                     .ok_or(self.err(format!("Unknown variable {var}")))?;
-                chunk.push_op(Operation::GetVar(idx), self.pos);
+                chunk.push_op(
+                    Operation::GetVar(self.to_u8(idx, "More than 255 variables in local scope")?),
+                    self.pos,
+                );
             }
 
             ExprType::VecDef(exprs) => {
                 for expr in exprs.iter().rev() {
                     chunk = expr.to_chunk(chunk)?;
                 }
-                chunk.push_op(Operation::VecCollect(exprs.len()), self.pos);
+                chunk.push_op(
+                    Operation::VecCollect(
+                        self.to_u8(exprs.len(), "More than 255 elements in vector literal")?,
+                    ),
+                    self.pos,
+                );
             }
 
             ExprType::VecGet { vec, idx } => match idx.len() {
@@ -284,12 +296,12 @@ impl Expr {
                 chunk = f
                     .take_parent()
                     .expect("I just added the parent, now I'm taking it back.");
-                let idx = chunk.push_const(Value::Fn {
+                let f = Value::Fn {
                     num_params: args.len(),
                     captured: Vec::new(),
                     chunk: Rc::new(f),
-                });
-                chunk.push_op(Operation::Constant(idx), self.pos);
+                };
+                self.constant(&mut chunk, f)?;
             }
 
             ExprType::FnCall { func, args } => {
@@ -297,14 +309,20 @@ impl Expr {
                     chunk = arg.to_chunk(chunk)?;
                 }
                 chunk = func.to_chunk(chunk)?;
-                chunk.push_op(Operation::FnCall(args.len()), self.pos);
+                chunk.push_op(
+                    Operation::FnCall(self.to_u8(args.len(), "More than 255 function arguments")?),
+                    self.pos,
+                );
             }
             ExprType::ObjectDef(fields) => {
                 for (k, v) in fields {
                     chunk = k.to_chunk(chunk)?;
                     chunk = v.to_chunk(chunk)?;
                 }
-                chunk.push_op(Operation::ObjCollect(fields.len()), self.pos);
+                chunk.push_op(
+                    Operation::ObjCollect(self.to_u8(fields.len(), "More than 255 object fields")?),
+                    self.pos,
+                );
             }
             ExprType::Read => {
                 chunk.push_op(Operation::Read, self.pos);
@@ -326,13 +344,12 @@ impl Expr {
                     &format!("could not compile imported file {filename}"),
                     self.pos,
                 )?;
-                let const_idx = chunk.push_const(Value::Fn {
+                let f = Value::Fn {
                     num_params: 0,
                     captured: Vec::new(),
                     chunk: Rc::new(use_chunk),
-                });
-                chunk.push_op(Operation::Constant(const_idx), self.pos);
-                chunk.push_op(Operation::FnCall(0), self.pos);
+                };
+                self.constant(&mut chunk, f)?;
             }
             ex => return Err(self.err(format!("Unimplemented expression {ex:?}"))),
         }
@@ -341,6 +358,17 @@ impl Expr {
     }
     fn err(&self, msg: String) -> Error {
         Error::new(msg).stack(self.pos)
+    }
+
+    fn constant(&self, chunk: &mut Chunk, v: Value) -> Result<()> {
+        let idx = chunk.push_const(v);
+        let idx = self.to_u8(idx, "More than 255 constants in local scope")?;
+        chunk.push_op(Operation::Constant(idx), self.pos);
+        Ok(())
+    }
+
+    fn to_u8(&self, n: usize, msg: &str) -> Result<u8> {
+        n.try_into().map_err(Error::from).wrap(msg, self.pos)
     }
 }
 

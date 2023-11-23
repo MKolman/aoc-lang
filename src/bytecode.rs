@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operation {
     Nil,
-    Constant(usize),
-    GetVar(usize),
-    SetVar(usize),
+    Constant(u8),
+    GetVar(u8),
+    SetVar(u8),
     Add,
     Sub,
     Mul,
@@ -12,7 +12,7 @@ pub enum Operation {
     Negate,
     UnaryPlus,
 
-    Print(usize),
+    Print(u8),
     Read,
 
     Not,
@@ -29,14 +29,14 @@ pub enum Operation {
     Pop,
 
     Return,
-    Jump(i64),
-    JumpIf(i64),
+    Jump(i8),
+    JumpIf(i8),
     Noop,
 
     VecGet,
     VecSlice,
     VecSet,
-    VecCollect(usize),
-    ObjCollect(usize),
-    FnCall(usize),
+    VecCollect(u8),
+    ObjCollect(u8),
+    FnCall(u8),
 }

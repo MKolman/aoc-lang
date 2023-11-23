@@ -51,7 +51,7 @@ impl<W: Write> Executor<W> {
             let result = match cmd {
                 Operation::Return => break,
                 Operation::Constant(idx) => {
-                    let mut val = self.chunk.get_const(idx).clone();
+                    let mut val = self.chunk.get_const(idx as usize).clone();
                     if let Value::Fn {
                         captured, chunk, ..
                     } = &mut val
@@ -69,8 +69,8 @@ impl<W: Write> Executor<W> {
                     self.stack.push(Value::Nil);
                     Ok(())
                 }
-                Operation::GetVar(idx) => self.get_var(idx),
-                Operation::SetVar(idx) => self.set_var(idx),
+                Operation::GetVar(idx) => self.get_var(idx as usize),
+                Operation::SetVar(idx) => self.set_var(idx as usize),
                 Operation::Negate => self.unary(&Self::op_negate),
                 Operation::Not => self.unary(&Self::op_not),
                 Operation::UnaryPlus => self.unary(&Self::op_unary_plus),
@@ -90,18 +90,18 @@ impl<W: Write> Executor<W> {
                 Operation::VecGet => self.binary(&Self::op_vec_get),
                 Operation::VecSlice => self.tertiary(&Self::op_vec_slice),
                 Operation::VecSet => self.tertiary(&Self::op_vec_set),
-                Operation::VecCollect(n) => self.vec_collect(n),
-                Operation::ObjCollect(n) => self.obj_collect(n),
-                Operation::Print(n) => self.print(n),
+                Operation::VecCollect(n) => self.vec_collect(n as usize),
+                Operation::ObjCollect(n) => self.obj_collect(n as usize),
+                Operation::Print(n) => self.print(n as usize),
                 Operation::Read => self.read(),
                 Operation::Pop => {
                     _ = self.stack.pop();
                     Ok(())
                 }
-                Operation::Jump(n) => self.jump(n),
-                Operation::JumpIf(n) => self.op_jump_if(n),
+                Operation::Jump(n) => self.jump(n as i64),
+                Operation::JumpIf(n) => self.op_jump_if(n as i64),
                 Operation::Noop => Ok(()),
-                Operation::FnCall(n) => self.fn_call(n),
+                Operation::FnCall(n) => self.fn_call(n as usize),
             };
             result.stack(self.chunk.pos[self.idx - 1])?;
         }

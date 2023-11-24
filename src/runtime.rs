@@ -131,7 +131,7 @@ impl Display for Value {
                     })
                     .collect();
                 if captured_var_names.len() > 0 {
-                    crate::execute::fmt_vec(f, &captured_var_names)?;
+                    crate::interpreter::fmt_vec(f, &captured_var_names)?;
                 }
                 write!(f, "{{ {} bytes }}>", chunk.num_bytecode())
             }

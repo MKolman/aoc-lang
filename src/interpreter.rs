@@ -9,7 +9,7 @@ use crate::{
 type Error = crate::error::Error<RuntimeError>;
 type Result<T> = crate::error::Result<T, RuntimeError>;
 
-pub struct Executor<W: Write> {
+pub struct Interpreter<W: Write> {
     chunk: Rc<Chunk>,
     stack: Vec<Value>,
     idx: usize,
@@ -17,7 +17,7 @@ pub struct Executor<W: Write> {
     debug: bool,
 }
 
-impl<W: Write> Executor<W> {
+impl<W: Write> Interpreter<W> {
     pub fn new(chunk: Rc<Chunk>) -> Self {
         Self {
             chunk,
@@ -491,7 +491,7 @@ fn wrap_vec_idx(idx: i64, len: usize) -> usize {
         idx as usize
     }
 }
-impl<W: Write> Display for Executor<W> {
+impl<W: Write> Display for Interpreter<W> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.chunk)?;
         write!(f, "Stack: ")?;

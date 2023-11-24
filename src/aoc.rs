@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{
     error,
-    execute::Executor,
+    interpreter::Interpreter,
     parser::Parser,
     runtime::{Chunk, Value},
     scanner::Scanner,
@@ -27,7 +27,7 @@ pub fn compile_and_run<W: std::io::Write>(code: &str, output: W) -> (Value, W) {
             return (Value::Nil, output);
         }
     };
-    let mut ex = Executor::new(Rc::new(chunk));
+    let mut ex = Interpreter::new(Rc::new(chunk));
     match ex.run(output) {
         Ok(value) => value,
         Err(e) => {

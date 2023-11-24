@@ -162,9 +162,9 @@ pub enum Capture {
 pub struct Chunk {
     pub bytecode: Vec<Operation>,
     pub pos: Vec<Pos>,
-    constants: Vec<Value>,
+    pub constants: Vec<Value>,
     var_index: HashMap<String, usize>,
-    var_names: Vec<String>,
+    pub var_names: Vec<String>,
     pub captured_vars: Vec<Capture>,
     parent: Option<Box<Chunk>>,
 }

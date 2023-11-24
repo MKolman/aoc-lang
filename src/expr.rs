@@ -111,7 +111,7 @@ pub enum ExprType {
     Return(Box<Expr>),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Expr {
     pub pos: Pos,
     pub kind: ExprType,
@@ -369,6 +369,16 @@ impl Expr {
 
     fn to_u8(&self, n: usize, msg: &str) -> Result<u8> {
         n.try_into().map_err(Error::from).wrap(msg, self.pos)
+    }
+}
+
+impl std::fmt::Debug for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "{:#?}", self.kind)
+        } else {
+            write!(f, "{:?}", self.kind)
+        }
     }
 }
 

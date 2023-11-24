@@ -18,12 +18,12 @@ pub struct Interpreter<W: Write> {
 }
 
 impl<W: Write> Interpreter<W> {
-    pub fn new(chunk: Rc<Chunk>) -> Self {
+    pub fn new(chunk: Rc<Chunk>, output: W) -> Self {
         Self {
             chunk,
             stack: Vec::new(),
             idx: 0,
-            output: None,
+            output: Some(output),
             debug: false,
         }
     }
@@ -32,8 +32,7 @@ impl<W: Write> Interpreter<W> {
         self.debug = debug;
     }
 
-    pub fn run(&mut self, output: W) -> Result<(Value, W)> {
-        self.output = Some(output);
+    pub fn run(&mut self) -> Result<Value> {
         for i in self.stack.len()..self.chunk.num_var() {
             match &self.chunk.captured_vars[i] {
                 Capture::Local => self.stack.push(Value::Nil),
@@ -44,9 +43,7 @@ impl<W: Write> Interpreter<W> {
             };
         }
         while let Some(&cmd) = self.chunk.bytecode.get(self.idx) {
-            if self.debug {
-                eprintln!("{self}\n=======");
-            }
+            self.dump_stack();
             self.idx += 1;
             let result = match cmd {
                 Operation::Return => break,
@@ -105,10 +102,7 @@ impl<W: Write> Interpreter<W> {
             };
             result.stack(self.chunk.pos[self.idx - 1])?;
         }
-        Ok((
-            self.stack.pop().expect("frame did not return a value"),
-            self.output.take().unwrap(),
-        ))
+        Ok(self.stack.pop().expect("frame did not return a value"))
     }
 
     fn unary(&mut self, cmd: &dyn Fn(Value) -> Result<Value>) -> Result<()> {
@@ -401,18 +395,10 @@ impl<W: Write> Interpreter<W> {
     fn print(&mut self, num_args: usize) -> Result<()> {
         let mut args = self.stack.split_off(self.stack.len() - num_args);
         for arg in &args {
-            if let Some(out) = &mut self.output {
-                write!(out, "{arg}").map_err(Error::from)?;
-            } else {
-                print!("{arg}");
-            }
+            write!(self.output.as_mut().unwrap(), "{arg}").map_err(Error::from)?;
         }
         let last = args.pop().unwrap_or(Value::Nil);
-        if let Some(out) = &mut self.output {
-            writeln!(out).expect("invalid writer");
-        } else {
-            println!();
-        }
+        writeln!(self.output.as_mut().unwrap()).expect("invalid writer");
         self.stack.push(last);
         Ok(())
     }
@@ -449,7 +435,7 @@ impl<W: Write> Interpreter<W> {
             panic!("function expects {num_params} args, but got {num_args}");
         }
         let args = self.stack.split_off(self.stack.len() - num_args);
-        let mut executor = Self::new(chunk);
+        let mut executor = Self::new(chunk, self.output.take().unwrap());
         for (arg, captured) in args.into_iter().zip(executor.chunk.captured_vars.iter()) {
             match captured {
                 Capture::Local => executor.stack.push(arg),
@@ -467,20 +453,34 @@ impl<W: Write> Interpreter<W> {
                 Capture::Captured(_) => executor.stack.push(captured.next().unwrap().clone()),
             }
         }
-        if self.debug {
-            eprintln!(" ==== Calling function:\n{}\n ======", executor);
-        }
-        match executor.run(self.output.take().unwrap()) {
-            Ok((val, output)) => {
-                self.output = Some(output);
+        let result = executor.run();
+        self.output = Some(executor.output.take().unwrap());
+        match result {
+            Ok(val) => {
                 self.stack.push(val);
                 Ok(())
             }
-            Err(e) => {
-                self.output = Some(executor.output.take().unwrap());
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
+    }
+    fn dump_stack(&mut self) {
+        if !self.debug {
+            return;
+        }
+        let f = self.output.as_mut().unwrap();
+        writeln!(
+            f,
+            "=== Next operation ===\n{}: {:?}",
+            self.idx, self.chunk.bytecode[self.idx]
+        )
+        .unwrap();
+        writeln!(f, "=== Stack ===").unwrap();
+        self.stack
+            .iter()
+            .enumerate()
+            .rev()
+            .for_each(|(i, v)| writeln!(f, "{i}: {v}").unwrap());
+        writeln!(f, "=== Stdout ===").unwrap();
     }
 }
 
@@ -489,27 +489,6 @@ fn wrap_vec_idx(idx: i64, len: usize) -> usize {
         len - (-idx) as usize
     } else {
         idx as usize
-    }
-}
-impl<W: Write> Display for Interpreter<W> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.chunk)?;
-        write!(f, "Stack: ")?;
-        fmt_vec(f, &self.stack)?;
-        write!(f, "\nBytecode: [")?;
-        for (i, a) in self.chunk.bytecode.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            if i == self.idx {
-                write!(f, " >>>")?;
-            }
-            write!(f, "{a:?}")?;
-            if i == self.idx {
-                write!(f, "<<< ")?;
-            }
-        }
-        write!(f, "]")
     }
 }
 pub fn fmt_vec<T>(f: &mut std::fmt::Formatter<'_>, v: &Vec<T>) -> std::fmt::Result

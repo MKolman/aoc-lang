@@ -233,7 +233,8 @@ print(isEven(4, idOdd))
 
 ### Vector
 
-Vectors are a collection of arbitrary other values.
+Vectors are a collection of arbitrary other values. Vectors can be added with other vectors to be concatenated.
+You can also multiply them with integers to repeat them. Use prefix `+` to get the length of the vector.
 
 ```
 v = [12 + 5, fn(x) x+1, [1, 2, 3]]
@@ -242,6 +243,11 @@ print(v[1](10))
 v[2][1] = 10
 print(v[2])
 | [1, 10, 3]
+print(v[2] * 3)
+| [1, 2, 3, 1, 2, 3, 1, 2, 3]
+v = [nil] * 100
+print(+v)
+| 100
 ```
 
 ### Object
@@ -286,12 +292,28 @@ fox.walk()
 
 ### String
 
-Strings are immutable and can be constructed using double quotes.
+Strings are immutable and can be constructed using double quotes. You can use the square brackets to access individual characters or slices of the string.
+Use prefix `+` to get the length of the string.
 
 ```
 > a = "Hello World"
 > print(a)
 | Hello World
+> print(a[0, 5])
+| Hello
+> print(+a)
+| 11
+```
+
+NOTE: Characters are not a new type they're just integer numbers equivalent to charaters ascii
+value and can be accessed in string using the square brackets or constructed using single quotes `'`.
+
+```
+> a = "123"
+> print(a[0])
+| 49
+print('A')
+| 65
 ```
 
 ## Language TODO list
@@ -340,6 +362,8 @@ Strings are immutable and can be constructed using double quotes.
 - [x] Return
   - `return 12`
   - Can also be used at the top level to terminate the program
+- [x] Error reporting during parsing, compilation and runtime
+- [x] Imports
+  - `use "path/to/file.aoc"`
 - [ ] Break
 - [ ] Standard library
-- [ ] Imports

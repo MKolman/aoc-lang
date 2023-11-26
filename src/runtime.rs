@@ -300,14 +300,20 @@ impl AddAssign<Chunk> for Chunk {
 
 impl Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Shared vars: {:?}", self.captured_vars)?;
-        write!(f, "Constants: [")?;
-        for (i, a) in self.constants.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{a}")?;
+        writeln!(f, "=== Constants ===").unwrap();
+        for (i, c) in self.constants.iter().enumerate() {
+            writeln!(f, "{i}: {c}").unwrap();
         }
-        write!(f, "]")
+        writeln!(f, "=== Variables ===").unwrap();
+        self.var_names
+            .iter()
+            .zip(self.captured_vars.iter())
+            .enumerate()
+            .for_each(|(i, (s, c))| writeln!(f, "{i}: {s:?} ({c:?})").unwrap());
+        writeln!(f, "=== Bytecode ===").unwrap();
+        self.bytecode
+            .iter()
+            .for_each(|op| writeln!(f, "{:?}", op).unwrap());
+        Ok(())
     }
 }

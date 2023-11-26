@@ -420,22 +420,26 @@ impl<W: Write> Interpreter<W> {
 
     fn fn_call(&mut self, num_args: usize) -> Result<()> {
         let func = self.stack.pop().expect("Ran out of stack.");
+        if self.debug {
+            writeln!(self.output.as_mut().unwrap(), "=== Function {func} ===",).unwrap();
+        }
         let Value::Fn {
             num_params,
             captured,
             chunk,
         } = func
         else {
-            panic!(
-                "Only functions can be called, not {func}. {:?}",
-                self.chunk.pos[self.idx - 1]
-            );
+            return Err(format!("Only functions can be called, not {func:?}.").into());
         };
         if num_params != num_args {
-            panic!("function expects {num_params} args, but got {num_args}");
+            return Err(format!("function expects {num_params} args, but got {num_args}").into());
         }
         let args = self.stack.split_off(self.stack.len() - num_args);
+        if self.debug {
+            writeln!(self.output.as_mut().unwrap(), "{chunk}").unwrap();
+        }
         let mut executor = Self::new(chunk, self.output.take().unwrap());
+        executor.set_debug(self.debug);
         for (arg, captured) in args.into_iter().zip(executor.chunk.captured_vars.iter()) {
             match captured {
                 Capture::Local => executor.stack.push(arg),
@@ -455,6 +459,9 @@ impl<W: Write> Interpreter<W> {
         }
         let result = executor.run();
         self.output = Some(executor.output.take().unwrap());
+        if self.debug {
+            writeln!(self.output.as_mut().unwrap(), "=== Exit function ===").unwrap();
+        }
         match result {
             Ok(val) => {
                 self.stack.push(val);
@@ -468,18 +475,18 @@ impl<W: Write> Interpreter<W> {
             return;
         }
         let f = self.output.as_mut().unwrap();
-        writeln!(
-            f,
-            "=== Next operation ===\n{}: {:?}",
-            self.idx, self.chunk.bytecode[self.idx]
-        )
-        .unwrap();
         writeln!(f, "=== Stack ===").unwrap();
         self.stack
             .iter()
             .enumerate()
             .rev()
             .for_each(|(i, v)| writeln!(f, "{i}: {v}").unwrap());
+        writeln!(
+            f,
+            "=== Next operation ===\n{}: {:?}",
+            self.idx, self.chunk.bytecode[self.idx]
+        )
+        .unwrap();
         writeln!(f, "=== Stdout ===").unwrap();
     }
 }

@@ -54,16 +54,11 @@ pub fn run(code: &str, debug: bool) -> String {
 
 pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
     let tokens = Scanner::new(code);
-    writeln!(
-        output,
-        "=== Tokens ===\n{:?}",
-        tokens
-            .clone()
-            .into_iter()
-            .map(|t| t.kind)
-            .collect::<Vec<_>>()
-    )
-    .unwrap();
+    writeln!(output, "=== Tokens ===").unwrap();
+    tokens
+        .clone()
+        .into_iter()
+        .for_each(|t| writeln!(output, "{:?}", t.kind).unwrap());
     let expr = match Parser::new(tokens).parse() {
         Ok(expr) => expr,
         Err(e) => {
@@ -81,23 +76,7 @@ pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
             return (Value::Nil, output);
         }
     };
-    writeln!(output, "=== Runtime ===").unwrap();
-    writeln!(output, "=== Constants ===").unwrap();
-    for (i, c) in chunk.constants.iter().enumerate() {
-        writeln!(output, "{i}: {c}").unwrap();
-    }
-    writeln!(output, "=== Variables ===").unwrap();
-    chunk
-        .var_names
-        .iter()
-        .zip(chunk.captured_vars.iter())
-        .enumerate()
-        .for_each(|(i, (s, c))| writeln!(output, "{i}: {s:?} ({c:?})").unwrap());
-    writeln!(output, "=== Bytecode ===").unwrap();
-    chunk
-        .bytecode
-        .iter()
-        .for_each(|op| writeln!(output, "{:?}", op).unwrap());
+    write!(output, "=== Runtime ===\n{chunk}").unwrap();
     writeln!(output, "=== Stdout ===").unwrap();
     let mut ex = Interpreter::new(Rc::new(chunk), &mut output);
     ex.set_debug(true);

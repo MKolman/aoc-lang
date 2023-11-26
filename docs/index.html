@@ -23,7 +23,7 @@
             overflow: auto;
         }
 
-        #run {
+        .run {
             font-size: 1em;
             padding: 0.3em 1em 0.3em 1em;
             display: inline-flex;
@@ -33,15 +33,34 @@
             color: white;
         }
 
-        #run span {
+        .run:disabled {
+            background-color: #8F908A;
+        }
+
+        .run span {
             margin-left: 1em;
         }
 
-        #run small {
+        .run small {
             color: #8F908A;
         }
 
-        #result {
+        .hide-debug .debug {
+            display: none;
+        }
+
+        div.debug {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .debug pre {
+            display: inline-block;
+            vertical-align: top;
+            flex-grow: 1;
+        }
+
+        pre {
             border: solid black 1px;
             padding: 1em;
         }
@@ -49,7 +68,7 @@
 </head>
 
 <body>
-    <div id="wrapper">
+    <div id="wrapper" class="hide-debug">
         <h1>Another Obscure Coding Language</h1>
         <p>This is an online interpreter for AOC Lang created by <a href="https://www.kolman.si">me</a>. See more about
             the syntax on the <a href="https://github.com/MKolman/aoc-lang">aoc-lang github repo</a>.</p>
@@ -63,31 +82,105 @@
             <button class="pill" onclick="loadExample('tree')">Binary tree set</button>
         </div>
         <pre id="code"></pre>
-        <button onclick="run()" id="run">
-            &gt; <span>Run<br><small>ctrl + ⏎</small></span>
-        </button>
+        <div>
+            <button onclick="run(false)" class="run" id="run">
+                &gt; <span>Run<br><small>ctrl + ⏎</small></span>
+            </button>
+            <button onclick="run(true)" class="run" id="debug">
+                &gt; <span>Debug<br><small>ctrl + shift + ⏎</small></span>
+            </button>
+            <button onclick="debug_step()" class="run" id="debug_step">
+                &gt; <span>Debug step<br><small><span id="num_debug_steps">0</span> steps left</small></span>
+            </button>
+        </div>
 
         <a href="#" onclick="cancelRun()">
             Kill running program
         </a>
-        <pre id="result"></pre>
+        <pre class="stdout" id="stdout"></pre>
+        <h2 class="debug">Precompile representations</h2>
+        <div class="debug">
+            <pre class="tokens"></pre>
+            <pre class="expression"></pre>
+        </div>
+        <template id="frame">
+            <h2 class="debug frame function"></h2>
+            <div class="debug frame">
+                <pre class="stack"></pre>
+                <pre class="next_operation"></pre>
+            </div>
+            <div class="debug frame">
+                <pre class="constants"></pre>
+                <pre class="variables"></pre>
+                <pre class="bytecode"></pre>
+            </div>
+        </template>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.31.1/src-min-noconflict/ace.min.js" type="text/javascript" charset="utf-8"></script>
     <script>
         const editor = ace.edit("code");
         editor.setTheme("ace/theme/monokai");
-        editor.session.setMode("ace/mode/c_cpp");
+        editor.session.setMode("ace/mode/rust");
         new ResizeObserver(() => editor.resize()).observe(code);
     </script>
     <script>
-        const result = document.getElementById("result");
+        const stdout = document.getElementById("stdout");
+        const num_debug_steps = document.getElementById("num_debug_steps");
+        let debugSteps = [];
         let worker = newRunner();
-        function run() {
-            result.innerHTML = "Running..."
-            worker.postMessage({ code: editor.getValue() });
+        function run(debug) {
+            stdout.innerHTML = "Running..."
+            worker.postMessage({ code: editor.getValue(), debug });
         }
-        function processRunResult({ success, message }) {
-            result.innerText = message;
+        function splitSections(text) {
+            let result = [];
+            let next = {id: "function", content: "Function main"};
+            console.log(text);
+            for (let line of text.split("\n")) {
+                if (line.startsWith("=== ") && line.endsWith(" ===")) {
+                    result.push(next);
+                    const title = line.slice(4, -4);
+                    if (title.startsWith("Function ")) {
+                        next = {id: "function", content: title};
+                    } else {
+                        next = {id: title.toLowerCase().replace(" ", "_"), content: line + "\n"};
+                    }
+                    if (next.id == "stderr") next.id = "stdout";
+                } else {
+                    next.content += line + "\n";
+                }
+            }
+            result.push(next);
+            debugSteps = result.reverse();
+        }
+        function debug_step() {
+            const updated = {};
+            while (debugSteps.length > 0 && !updated[debugSteps.at(-1).id]) {
+                let {id, content} = debugSteps.pop();
+                updated[id] = true;
+                if (id == "function") {
+                    const frame = document.getElementById("frame").content.cloneNode(true);
+                    stdout.after(...frame.childNodes);
+                } else if (id == "exit_function") {
+                    const frames = document.getElementsByClassName("frame");
+                    frames[2].remove();
+                    frames[1].remove();
+                    frames[0].remove();
+                }
+                console.log(id);
+                const el = document.getElementsByClassName(id)[0];
+                if (el) el.innerText = content;
+                num_debug_steps.innerText = debugSteps.length;
+            }
+        }
+        function processRunResult({ success, message, debug }) {
+            setDebugMode(debug);
+            if (!debug) {
+                stdout.innerText = message;
+                return;
+            }
+            splitSections(message);
+            debug_step();  
         }
         function newRunner() {
             const worker = new Worker("./runner.js");
@@ -97,7 +190,9 @@
         function cancelRun() {
             worker.terminate();
             worker = newRunner();
-            result.innerHTML = "Canceled."
+            stdout.innerHTML = "Canceled."
+            debugSteps = [];
+            setDebugMode(false);
         }
         async function loadExample(name) {
             console.log(name);
@@ -105,8 +200,19 @@
             editor.setValue(await resp.text(), -1);
 
         }
+        function setDebugMode(debug) {
+            document.getElementById("debug_step").disabled = !debug;
+            if (debug) {
+                document.getElementById("wrapper").classList.remove("hide-debug");
+            } else {
+                document.getElementById("wrapper").classList.add("hide-debug");
+                document.querySelectorAll("#wrapper > .frame").forEach(e => e.remove());
+            }
+        }
         document.addEventListener("keydown", (event) => {
-            if (event.ctrlKey && event.keyCode == 13) run();
+            if (event.ctrlKey && event.shiftKey && event.keyCode == 13 && debugSteps.length == 0) run(true);
+            else if (event.ctrlKey && event.shiftKey && event.keyCode == 13) debug_step();
+            else if (event.ctrlKey && event.keyCode == 13) run(false);
         })
         loadExample('primes');
     </script>

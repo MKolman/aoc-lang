@@ -5,7 +5,7 @@ use crate::bytecode::Operation;
 use crate::error::Stackable;
 use crate::runtime::{Chunk, Value};
 use crate::token::Pos;
-use crate::{parser, scanner};
+use crate::{lexer, parser};
 
 type Error = crate::error::Error<crate::error::SyntaxError>;
 type Result<T> = crate::error::Result<T, crate::error::SyntaxError>;
@@ -335,7 +335,7 @@ impl Expr {
                 let code = std::fs::read_to_string(filename)
                     .map_err(Error::from)
                     .wrap(&format!("cannot open imported file {filename}"), self.pos)?;
-                let tokens = scanner::Scanner::new(&code);
+                let tokens = lexer::Lexer::new(&code);
                 let expr = parser::Parser::new(tokens)
                     .parse()
                     .map_err(Error::from)

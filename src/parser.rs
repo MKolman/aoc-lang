@@ -3,17 +3,17 @@ use std::rc::Rc;
 
 use crate::error;
 use crate::expr::{Expr, ExprType, Operator};
-use crate::scanner::Scanner;
+use crate::lexer::Lexer;
 use crate::token::{Pos, Token, TokenType};
 
 type Error = error::Error<error::ParserError>;
 type Result<T> = error::Result<T, error::ParserError>;
 
 pub struct Parser<'a> {
-    tokens: std::iter::Peekable<Scanner<'a>>,
+    tokens: std::iter::Peekable<Lexer<'a>>,
 }
 impl<'a> Parser<'a> {
-    pub fn new(tokens: Scanner) -> Parser {
+    pub fn new(tokens: Lexer) -> Parser {
         Parser {
             tokens: tokens.into_iter().peekable(),
         }

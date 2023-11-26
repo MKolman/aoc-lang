@@ -3,14 +3,14 @@ use std::rc::Rc;
 use crate::{
     error,
     interpreter::Interpreter,
+    lexer::Lexer,
     parser::Parser,
     runtime::{Chunk, Value},
-    scanner::Scanner,
 };
 use wasm_bindgen::prelude::*;
 
 pub fn compile_and_run<W: std::io::Write>(code: &str, mut output: W) -> Value {
-    let tokens = Scanner::new(code);
+    let tokens = Lexer::new(code);
     let expr = match Parser::new(tokens).parse() {
         Ok(expr) => expr,
         Err(e) => {
@@ -53,7 +53,7 @@ pub fn run(code: &str, debug: bool) -> String {
 }
 
 pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
-    let tokens = Scanner::new(code);
+    let tokens = Lexer::new(code);
     writeln!(output, "=== Tokens ===").unwrap();
     tokens
         .clone()

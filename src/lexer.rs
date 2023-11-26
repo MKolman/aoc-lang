@@ -3,13 +3,13 @@ use std::{iter::Peekable, str::CharIndices};
 use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone)]
-pub struct Scanner<'a> {
+pub struct Lexer<'a> {
     input: &'a str,
     iter: Peekable<CharIndices<'a>>,
     eof: bool,
 }
 
-impl<'a> Scanner<'a> {
+impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Self {
             input,
@@ -147,7 +147,7 @@ impl<'a> Scanner<'a> {
     }
 }
 
-impl<'a> Iterator for Scanner<'a> {
+impl<'a> Iterator for Lexer<'a> {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.get_token();
@@ -167,7 +167,7 @@ mod test {
 
     #[test]
     fn arithmetic() {
-        let s = Scanner::new("a = 12 + 3.5 * 12 / 0.1");
+        let s = Lexer::new("a = 12 + 3.5 * 12 / 0.1");
         assert_eq!(
             s.map(|t| t.kind).collect::<Vec<_>>(),
             vec![
@@ -187,7 +187,7 @@ mod test {
 
     #[test]
     fn comment() {
-        let s = Scanner::new("if for while print fn # test comment\n\tread");
+        let s = Lexer::new("if for while print fn # test comment\n\tread");
         assert_eq!(
             s.map(|t| t.kind).collect::<Vec<_>>(),
             vec![

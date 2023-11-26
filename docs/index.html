@@ -75,6 +75,7 @@
 
         <div>
             Example programs:
+            <button class="pill" onclick="loadExample('fizzbuzz')">FizzBuzz</button>
             <button class="pill" onclick="loadExample('primes')">Prime numbers</button>
             <button class="pill" onclick="loadExample('sort')">Quick sort</button>
             <button class="pill" onclick="loadExample('dfs')">Path finder</button>
@@ -214,7 +215,7 @@
             else if (event.ctrlKey && event.shiftKey && event.keyCode == 13) debug_step();
             else if (event.ctrlKey && event.keyCode == 13) run(false);
         })
-        loadExample('primes');
+        loadExample('fizzbuzz');
     </script>
 </body>
 

@@ -1,0 +1,12 @@
+fizzbuzz = fn(n) {
+    out = ""
+    if n % 3 == 0
+        out = "Fizz"
+    if n % 5 == 0
+        return out + "Buzz"
+    return out || n
+}
+
+for n = 1; n <= 30; n = n + 1 {
+    print(fizzbuzz(n))
+}

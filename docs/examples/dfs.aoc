@@ -7,8 +7,7 @@ min = fn(a, b) {
 find = fn(graph, start, end) {
     if start == end
         return 0
-    x = start[0]
-    y = start[1]
+    [x, y] = start
     oldval = graph[x][y]
     graph[x][y] = 2
     dist = +graph * +(graph[0])

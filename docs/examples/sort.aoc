@@ -3,11 +3,9 @@ quick_sort = fn(v, start, end) {
         pivot = start
         for i = pivot + 1; i < end; i += 1 {
             if v[i] < v[pivot] {
-                tmp = v[pivot]
-                v[pivot] = v[i]
-                v[i] = v[pivot+1]
-                v[pivot+1] = tmp
+                [v[pivot], v[i]] = [v[i], v[pivot]]
                 pivot += 1
+                [v[pivot], v[i]] = [v[i], v[pivot]]
             }
         }
         quick_sort(v, start, pivot)

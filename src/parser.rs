@@ -42,7 +42,6 @@ impl<'a> Parser<'a> {
     fn parse_single(&mut self) -> Result<Expr> {
         self.skip_whitespace();
         let result = self.parse_assignment()?;
-        self.skip_whitespace();
         Ok(result)
     }
 

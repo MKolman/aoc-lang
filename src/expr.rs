@@ -232,29 +232,13 @@ impl Expr {
                 );
                 chunk.jump_from(jump_if_idx)?;
             }
-            ExprType::Assign { left, right } => match &left.kind {
-                ExprType::Identifier(var) => {
-                    let idx = chunk.get_var(var);
-                    chunk = right.to_chunk(chunk)?;
-                    chunk.push_op(
-                        Operation::SetVar(
-                            self.to_u8(idx, "More than 255 variables in local scope")?,
-                        ),
-                        self.pos,
-                    );
+            ExprType::Assign { left, right } => {
+                if let ExprType::Identifier(var) = &left.kind {
+                    chunk.get_var(var); // Initialize variable for recursion
                 }
-                ExprType::VecGet { vec, idx } if idx.len() == 1 => {
-                    chunk = vec.to_chunk(chunk)?;
-                    chunk = idx[0].to_chunk(chunk)?;
-                    chunk = right.to_chunk(chunk)?;
-                    chunk.push_op(Operation::VecSet, self.pos);
-                }
-                ex => {
-                    return Err(self.err(format!(
-                        "Can only assign to plain variables and vectors not {ex:?}."
-                    )))
-                }
-            },
+                chunk = right.to_chunk(chunk)?;
+                chunk = left.inner_assign(chunk, self.pos)?;
+            }
             ExprType::AssignOp { op, left, right } => match &left.kind {
                 ExprType::Identifier(var) => {
                     let idx = chunk
@@ -410,6 +394,42 @@ impl Expr {
 
         Ok(chunk)
     }
+
+    fn inner_assign(&self, mut chunk: Chunk, pos: Pos) -> Result<Chunk> {
+        match &self.kind {
+            ExprType::Identifier(var) => {
+                let idx = chunk.get_var(var);
+                chunk.push_op(
+                    Operation::SetVar(self.to_u8(idx, "More than 255 variables in local scope")?),
+                    pos,
+                );
+            }
+            ExprType::VecGet { vec, idx } if idx.len() == 1 => {
+                chunk = vec.to_chunk(chunk)?;
+                chunk = idx[0].to_chunk(chunk)?;
+                chunk.push_op(Operation::VecSet, pos);
+            }
+            ExprType::VecDef(exprs) => {
+                chunk.push_op(
+                    Operation::VecUnpack(
+                        self.to_u8(exprs.len(), "Cannot unpack more than 255 elements")?,
+                    ),
+                    pos,
+                );
+                for expr in exprs {
+                    chunk = expr.inner_assign(chunk, pos)?;
+                    chunk.push_op(Operation::Pop, pos);
+                }
+            }
+            ex => {
+                return Err(self.err(format!(
+                    "Can only assign to plain variables and vectors not {ex:?}."
+                )))
+            }
+        }
+        Ok(chunk)
+    }
+
     fn err(&self, msg: String) -> Error {
         Error::new(msg).stack(self.pos)
     }

@@ -88,6 +88,7 @@ impl<W: Write> Interpreter<W> {
                 Operation::VecSlice => self.tertiary(&Self::op_vec_slice),
                 Operation::VecSet => self.tertiary(&Self::op_vec_set),
                 Operation::VecCollect(n) => self.vec_collect(n as usize),
+                Operation::VecUnpack(n) => self.vec_unpack(n as usize),
                 Operation::ObjCollect(n) => self.obj_collect(n as usize),
                 Operation::Print(n) => self.print(n as usize),
                 Operation::Read => self.read(),
@@ -360,7 +361,7 @@ impl<W: Write> Interpreter<W> {
             (a, b, c) => Err(format!("Unsupported VecGet for {a}[{b},{c}]").into()),
         }
     }
-    fn op_vec_set(vec: Value, index: Value, value: Value) -> Result<Value> {
+    fn op_vec_set(value: Value, vec: Value, index: Value) -> Result<Value> {
         match (vec, index) {
             (Value::Vec(v), Value::Int(i)) => {
                 let mut val = v.borrow_mut();
@@ -381,6 +382,24 @@ impl<W: Write> Interpreter<W> {
             vec.push(self.stack.pop().expect("Ran out of stack"));
         }
         self.stack.push(Value::Vec(Rc::new(RefCell::new(vec))));
+        Ok(())
+    }
+    fn vec_unpack(&mut self, size: usize) -> Result<()> {
+        let mut unpacked_values = Vec::with_capacity(size);
+        {
+            let vec = self.stack.last().expect("Ran out of stack");
+            let Value::Vec(vec) = vec else {
+                return Err(format!("Can only unpack vector not {vec:?}").into());
+            };
+            let vec = vec.borrow();
+            if vec.len() != size {
+                return Err(format!("Expected vector of length {size}, got {}", vec.len()).into());
+            }
+            for val in vec.iter().rev() {
+                unpacked_values.push(val.clone());
+            }
+        }
+        self.stack.extend(unpacked_values);
         Ok(())
     }
 

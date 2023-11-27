@@ -38,6 +38,7 @@ pub enum Operation {
     VecSlice,
     VecSet,
     VecCollect(u8),
+    VecUnpack(u8),
     ObjCollect(u8),
     FnCall(u8),
 }

@@ -2,6 +2,7 @@
 pub enum Operation {
     Nil,
     Constant(u8),
+    Clone(u8),
     GetVar(u8),
     SetVar(u8),
     Add,

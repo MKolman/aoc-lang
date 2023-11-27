@@ -99,6 +99,9 @@ impl<W: Write> Interpreter<W> {
                 Operation::JumpIf(n) => self.op_jump_if(n as i64),
                 Operation::Noop => Ok(()),
                 Operation::FnCall(n) => self.fn_call(n as usize),
+                Operation::Clone(idx) => Ok(self
+                    .stack
+                    .push(self.stack[self.stack.len() - 1 - idx as usize].clone())),
             };
             result.stack(self.chunk.pos[self.idx - 1])?;
         }
@@ -336,7 +339,7 @@ impl<W: Write> Interpreter<W> {
                 )? as i64,
             )),
             (Value::Obj(o), v) => Ok(o.borrow().get(&v).unwrap_or(&Value::Nil).clone()),
-            (a, b) => panic!("Unsupported VecGet for {}[{}]", a, b),
+            (a, b) => Err(format!("Unsupported VecGet for {}[{}]", a, b).into()),
         }
     }
     fn op_vec_slice(start_idx: Value, end_idx: Value, vec: Value) -> Result<Value> {

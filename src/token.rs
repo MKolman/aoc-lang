@@ -85,6 +85,11 @@ pub enum TokenType {
     Star,
     Slash,
     Percent,
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SlashEq,
+    PercentEq,
     // End
     EOL,
     EOF,

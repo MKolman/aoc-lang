@@ -51,6 +51,25 @@ impl Operator {
             HashSet::from([Operator::Mul, Operator::Div, Operator::Mod]),
         ]
     }
+
+    fn try_into_binary(&self) -> Option<Operation> {
+        Some(match self {
+            Operator::Add => Operation::Add,
+            Operator::Sub => Operation::Sub,
+            Operator::Mul => Operation::Mul,
+            Operator::Div => Operation::Div,
+            Operator::Mod => Operation::Mod,
+            Operator::And => Operation::And,
+            Operator::Or => Operation::Or,
+            Operator::Eq => Operation::Eq,
+            Operator::Neq => Operation::Neq,
+            Operator::Less => Operation::Lt,
+            Operator::LessEq => Operation::Leq,
+            Operator::Greater => Operation::Gt,
+            Operator::GreaterEq => Operation::Geq,
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -73,6 +92,11 @@ pub enum ExprType {
         val: Box<Expr>,
     },
     Assign {
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    AssignOp {
+        op: Operator,
         left: Box<Expr>,
         right: Box<Expr>,
     },
@@ -135,22 +159,8 @@ impl Expr {
                 chunk = right.to_chunk(chunk)?;
 
                 chunk.push_op(
-                    match op {
-                        Operator::Add => Operation::Add,
-                        Operator::Sub => Operation::Sub,
-                        Operator::Mul => Operation::Mul,
-                        Operator::Div => Operation::Div,
-                        Operator::Mod => Operation::Mod,
-                        Operator::And => Operation::And,
-                        Operator::Or => Operation::Or,
-                        Operator::Eq => Operation::Eq,
-                        Operator::Neq => Operation::Neq,
-                        Operator::Less => Operation::Lt,
-                        Operator::LessEq => Operation::Leq,
-                        Operator::Greater => Operation::Gt,
-                        Operator::GreaterEq => Operation::Geq,
-                        op => return Err(self.err(format!("Invalid binary operator {op:?}"))),
-                    },
+                    op.try_into_binary()
+                        .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
                     self.pos,
                 );
             }
@@ -237,6 +247,50 @@ impl Expr {
                     chunk = vec.to_chunk(chunk)?;
                     chunk = idx[0].to_chunk(chunk)?;
                     chunk = right.to_chunk(chunk)?;
+                    chunk.push_op(Operation::VecSet, self.pos);
+                }
+                ex => {
+                    return Err(self.err(format!(
+                        "Can only assign to plain variables and vectors not {ex:?}."
+                    )))
+                }
+            },
+            ExprType::AssignOp { op, left, right } => match &left.kind {
+                ExprType::Identifier(var) => {
+                    let idx = chunk
+                        .lookup_var(var, false)
+                        .ok_or(self.err(format!("Unknown variable {var}")))?;
+                    chunk.push_op(
+                        Operation::GetVar(
+                            self.to_u8(idx, "More than 255 variables in local scope")?,
+                        ),
+                        left.pos,
+                    );
+                    chunk = right.to_chunk(chunk)?;
+                    chunk.push_op(
+                        op.try_into_binary()
+                            .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
+                        self.pos,
+                    );
+                    chunk.push_op(
+                        Operation::SetVar(
+                            self.to_u8(idx, "More than 255 variables in local scope")?,
+                        ),
+                        self.pos,
+                    );
+                }
+                ExprType::VecGet { vec, idx } if idx.len() == 1 => {
+                    chunk = vec.to_chunk(chunk)?;
+                    chunk = idx[0].to_chunk(chunk)?;
+                    chunk.push_op(Operation::Clone(0), self.pos);
+                    chunk.push_op(Operation::Clone(2), self.pos);
+                    chunk.push_op(Operation::VecGet, self.pos);
+                    chunk = right.to_chunk(chunk)?;
+                    chunk.push_op(
+                        op.try_into_binary()
+                            .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
+                        self.pos,
+                    );
                     chunk.push_op(Operation::VecSet, self.pos);
                 }
                 ex => {

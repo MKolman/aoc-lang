@@ -7,6 +7,6 @@ fizzbuzz = fn(n) {
     return out || n
 }
 
-for n = 1; n <= 30; n = n + 1 {
+for n = 1; n <= 30; n += 1 {
     print(fizzbuzz(n))
 }

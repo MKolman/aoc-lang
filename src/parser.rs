@@ -48,18 +48,30 @@ impl<'a> Parser<'a> {
 
     fn parse_assignment(&mut self) -> Result<Expr> {
         let mut left = self.parse_binary_op(0)?;
-        if self.try_consume(&TokenType::Eq).is_some() {
+        if let Some((_, op)) = self.try_consume_assign_operator() {
             let right = self.parse_assignment()?;
-            left = Expr::new(
-                left.pos + right.pos,
-                ExprType::Assign {
-                    left: Box::new(left),
-                    right: Box::new(right),
-                },
-            )
+            if op == Operator::Eq {
+                left = Expr::new(
+                    left.pos + right.pos,
+                    ExprType::Assign {
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
+                )
+            } else {
+                left = Expr::new(
+                    left.pos + right.pos,
+                    ExprType::AssignOp {
+                        op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
+                )
+            }
         }
         Ok(left)
     }
+
     fn parse_binary_op(&mut self, idx: usize) -> Result<Expr> {
         if let Some(bin_ops) = Operator::all_bin().get(idx) {
             let mut left = self.parse_binary_op(idx + 1)?;
@@ -363,6 +375,22 @@ impl<'a> Parser<'a> {
         self.tokens
             .next()
             .map(|t| (t.pos, t.kind.to_operator().unwrap()))
+    }
+
+    fn try_consume_assign_operator(&mut self) -> Option<(Pos, Operator)> {
+        let Some(Token { pos: _, kind }) = self.tokens.peek() else {
+            return None;
+        };
+        let op = match kind {
+            TokenType::PlusEq => Operator::Add,
+            TokenType::MinusEq => Operator::Sub,
+            TokenType::StarEq => Operator::Mul,
+            TokenType::SlashEq => Operator::Div,
+            TokenType::PercentEq => Operator::Mod,
+            TokenType::Eq => Operator::Eq,
+            _ => return None,
+        };
+        self.tokens.next().map(|t| (t.pos, op))
     }
 
     fn try_consume(&mut self, consume_type: &TokenType) -> Option<Pos> {

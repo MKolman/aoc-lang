@@ -1,22 +1,20 @@
 quick_sort = fn(v, start, end) {
-    if start + 1 < end {
-        pivot = start
-        for i = pivot + 1; i < end; i += 1 {
-            if v[i] < v[pivot] {
-                [v[pivot], v[i]] = [v[i], v[pivot]]
-                pivot += 1
-                [v[pivot], v[i]] = [v[i], v[pivot]]
-            }
-        }
-        quick_sort(v, start, pivot)
-        quick_sort(v, pivot+1, end)
+    if start + 1 >= end {
+        return v
     }
-    1
+    pivot = start
+    for i = pivot + 1; i < end; i += 1 {
+        if v[i] < v[pivot] {
+            [v[pivot], v[i], v[pivot+1]] = [v[i], v[pivot+1], v[pivot]]
+            pivot += 1
+        }
+    }
+    quick_sort(v, start, pivot)
+    quick_sort(v, pivot+1, end)
 }
 
 sort = fn(v) {
     quick_sort(v, 0, +v)
-    v
 }
 
 print("These numbers were sorted using quick sort:")

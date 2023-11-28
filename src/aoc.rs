@@ -52,7 +52,7 @@ pub fn run(code: &str, debug: bool) -> String {
     String::from_utf8_lossy(&stdout).to_string()
 }
 
-pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
+pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> Value {
     let tokens = Lexer::new(code);
     writeln!(output, "=== Tokens ===").unwrap();
     tokens
@@ -64,7 +64,7 @@ pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
         Err(e) => {
             let mut output = output;
             dump_err(&mut output, e, code);
-            return (Value::Nil, output);
+            return Value::Nil;
         }
     };
     writeln!(output, "=== Expression ===\n{:#?}", expr).unwrap();
@@ -73,7 +73,7 @@ pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
         Err(e) => {
             let mut output = output;
             dump_err(&mut output, e, code);
-            return (Value::Nil, output);
+            return Value::Nil;
         }
     };
     write!(output, "=== Runtime ===\n{chunk}").unwrap();
@@ -81,10 +81,10 @@ pub fn debug_run<W: std::io::Write>(code: &str, mut output: W) -> (Value, W) {
     let mut ex = Interpreter::new(Rc::new(chunk), &mut output);
     ex.set_debug(true);
     match ex.run() {
-        Ok(value) => (value, output),
+        Ok(value) => value,
         Err(e) => {
             dump_err(&mut output, e, code);
-            (Value::Nil, output)
+            Value::Nil
         }
     }
 }

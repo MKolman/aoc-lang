@@ -388,6 +388,7 @@ impl Expr {
                     chunk: Rc::new(use_chunk),
                 };
                 self.constant(&mut chunk, f)?;
+                chunk.push_op(Operation::FnCall(0), self.pos);
             }
             ex => return Err(self.err(format!("Unimplemented expression {ex:?}"))),
         }

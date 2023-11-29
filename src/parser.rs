@@ -76,7 +76,7 @@ impl<'a> Parser<'a> {
             let mut left = self.parse_binary_op(idx + 1)?;
             let start_pos = left.pos;
             while let Some((_, op)) = self.try_consume_operator(Some(bin_ops)) {
-                let right = self.parse_binary_op(idx)?;
+                let right = self.parse_binary_op(idx + 1)?;
                 left = Expr::new(
                     start_pos + right.pos,
                     ExprType::BinaryOp {

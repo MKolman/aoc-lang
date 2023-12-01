@@ -216,14 +216,14 @@ impl Expr {
             }
             ExprType::While { cond, body } => {
                 chunk.push_op(Operation::Nil, self.pos);
-                let start_idx = chunk.num_bytecode() as i64;
+                let start_idx = chunk.num_bytecode();
                 chunk = cond.to_chunk(chunk)?;
                 let jump_if_idx = chunk.push_op(Operation::JumpIf(0), self.pos);
                 chunk.push_op(Operation::Pop, self.pos);
                 chunk = body.to_chunk(chunk)?;
                 chunk.push_op(
-                    Operation::Jump(
-                        (start_idx - 1 - chunk.num_bytecode() as i64)
+                    Operation::JumpBack(
+                        (chunk.num_bytecode() + 1usize - start_idx)
                             .try_into()
                             .map_err(Error::from)
                             .wrap("Loop body longer than 255 bytecode", self.pos)?,

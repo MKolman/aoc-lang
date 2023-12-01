@@ -30,8 +30,9 @@ pub enum Operation {
     Pop,
 
     Return,
-    Jump(i8),
-    JumpIf(i8),
+    Jump(u8),
+    JumpBack(u8),
+    JumpIf(u8),
     Noop,
 
     VecGet,

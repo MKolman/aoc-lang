@@ -98,6 +98,7 @@ impl<W: Write> Interpreter<W> {
                 }
                 Operation::Jump(n) => self.jump(n as i64),
                 Operation::JumpIf(n) => self.op_jump_if(n as i64),
+                Operation::JumpBack(n) => self.jump(-(n as i64)),
                 Operation::Noop => Ok(()),
                 Operation::FnCall(n) => self.fn_call(n as usize),
                 Operation::Clone(idx) => Ok(self

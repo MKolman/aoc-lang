@@ -262,7 +262,7 @@ impl Chunk {
                 let tmp = idx - from - 1;
                 *v = tmp.try_into().map_err(|e| {
                     error::Error::from(e).wrap(
-                        &format!("Trying to jump {tmp} instructions which does not fit into i8"),
+                        &format!("Trying to jump {tmp} instructions which does not fit into u8"),
                         self.pos[from],
                     )
                 })?;

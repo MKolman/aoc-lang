@@ -179,7 +179,7 @@ impl<'a> Parser<'a> {
                 TokenType::LBracket => self.parse_vec(pos),
                 TokenType::Return => self.parse_return(pos),
                 TokenType::Use => self.parse_use(pos),
-                t => panic!("Unexpected token {t:?}"), // t => Err(Error::build(format!("Unexpected token {t:?}"), pos)),
+                t => Err(Error::build(format!("Unexpected token {t:?}"), pos)),
             }
         } else {
             Err(format!("Unexpected EOF while parsing").into())

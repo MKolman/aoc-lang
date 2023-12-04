@@ -104,6 +104,11 @@ impl<W: Write> Interpreter<W> {
                 Operation::Clone(idx) => Ok(self
                     .stack
                     .push(self.stack[self.stack.len() - 1 - idx as usize].clone())),
+                Operation::Swap(idx) => {
+                    let len = self.stack.len();
+                    self.stack.swap(len - 1, len - 1 - idx as usize);
+                    Ok(())
+                }
             };
             result.stack(self.chunk.pos[self.idx - 1])?;
         }

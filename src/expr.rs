@@ -264,10 +264,10 @@ impl Expr {
                     );
                 }
                 ExprType::VecGet { vec, idx } if idx.len() == 1 => {
-                    chunk = vec.to_chunk(chunk)?;
                     chunk = idx[0].to_chunk(chunk)?;
-                    chunk.push_op(Operation::Clone(0), self.pos);
-                    chunk.push_op(Operation::Clone(2), self.pos);
+                    chunk = vec.to_chunk(chunk)?;
+                    chunk.push_op(Operation::Clone(1), self.pos);
+                    chunk.push_op(Operation::Clone(1), self.pos);
                     chunk.push_op(Operation::VecGet, self.pos);
                     chunk = right.to_chunk(chunk)?;
                     chunk.push_op(
@@ -275,6 +275,7 @@ impl Expr {
                             .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
                         self.pos,
                     );
+                    chunk.push_op(Operation::Swap(2), self.pos);
                     chunk.push_op(Operation::VecSet, self.pos);
                 }
                 ex => {

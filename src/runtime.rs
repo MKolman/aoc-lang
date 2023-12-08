@@ -83,6 +83,30 @@ impl PartialEq for Value {
 
 impl Eq for Value {}
 
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Int(a), Self::Int(b)) => a.partial_cmp(b),
+            (Self::Int(a), Self::Float(b)) => (*a as f64).partial_cmp(b),
+            (Self::Float(a), Self::Int(b)) => a.partial_cmp(&(*b as f64)),
+            (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
+            (Self::Str(a), Self::Str(b)) => a.partial_cmp(b),
+            (Self::Nil, Self::Nil) => Some(std::cmp::Ordering::Equal),
+            (Self::Vec(a), Self::Vec(b)) => {
+                for (x, y) in a.borrow().iter().zip(b.borrow().iter()) {
+                    match x.partial_cmp(y) {
+                        Some(std::cmp::Ordering::Equal) => continue,
+                        other => return other,
+                    }
+                }
+                a.borrow().len().partial_cmp(&b.borrow().len())
+            }
+            (Self::Ref(v), other) | (other, Self::Ref(v)) => other.partial_cmp(&v.borrow()),
+            _ => None,
+        }
+    }
+}
+
 impl Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {

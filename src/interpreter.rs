@@ -303,29 +303,39 @@ impl<W: Write> Interpreter<W> {
     }
 
     fn op_gt(left: Value, right: Value) -> Result<Value> {
-        let v = match (left, right) {
-            (Value::Int(a), Value::Int(b)) => Value::Int((a > b) as i64),
-            (Value::Float(a), Value::Float(b)) => Value::Int((a > b) as i64),
-            (Value::Float(a), Value::Int(b)) => Value::Int((a > b as f64) as i64),
-            (Value::Int(a), Value::Float(b)) => Value::Int((a as f64 > b) as i64),
-            (a, b) => return Err(format!("Unsupported Gt for {:?} and {:?}", a, b).into()),
-        };
-        Ok(v)
+        match left.partial_cmp(&right) {
+            Some(std::cmp::Ordering::Greater) => Ok(Value::Int(1)),
+            Some(std::cmp::Ordering::Equal) => Ok(Value::Int(0)),
+            Some(std::cmp::Ordering::Less) => Ok(Value::Int(0)),
+            None => Err(format!("Cannot compare {left:?} and {right:?}").into()),
+        }
     }
 
     fn op_geq(left: Value, right: Value) -> Result<Value> {
-        Self::op_or(
-            Self::op_eq(left.clone(), right.clone())?,
-            Self::op_gt(left, right)?,
-        )
+        match left.partial_cmp(&right) {
+            Some(std::cmp::Ordering::Greater) => Ok(Value::Int(1)),
+            Some(std::cmp::Ordering::Equal) => Ok(Value::Int(1)),
+            Some(std::cmp::Ordering::Less) => Ok(Value::Int(0)),
+            None => Err(format!("Cannot compare {left:?} and {right:?}").into()),
+        }
     }
 
     fn op_lt(left: Value, right: Value) -> Result<Value> {
-        Self::op_not(Self::op_geq(left, right)?)
+        match left.partial_cmp(&right) {
+            Some(std::cmp::Ordering::Greater) => Ok(Value::Int(0)),
+            Some(std::cmp::Ordering::Equal) => Ok(Value::Int(0)),
+            Some(std::cmp::Ordering::Less) => Ok(Value::Int(1)),
+            None => Err(format!("Cannot compare {left:?} and {right:?}").into()),
+        }
     }
 
     fn op_leq(left: Value, right: Value) -> Result<Value> {
-        Self::op_not(Self::op_gt(left, right)?)
+        match left.partial_cmp(&right) {
+            Some(std::cmp::Ordering::Greater) => Ok(Value::Int(0)),
+            Some(std::cmp::Ordering::Equal) => Ok(Value::Int(1)),
+            Some(std::cmp::Ordering::Less) => Ok(Value::Int(1)),
+            None => Err(format!("Cannot compare {left:?} and {right:?}").into()),
+        }
     }
     fn op_vec_get(index: Value, vec: Value) -> Result<Value> {
         match (vec, index) {

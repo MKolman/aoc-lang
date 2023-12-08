@@ -319,11 +319,13 @@ print('A')
 ## Language TODO list
 
 - [x] Arithmetic operations
-  - `1 + 3 / (2 - 10)`
+  - `1 + 3 / (2 - 10) << 2`
 - [x] Printing
   - `print(12 * 3)`
 - [x] Variables
-  - `a = 5 + a`
+  - `a = 5 + a*a`
+  - `a += 3`
+  - `b = a *= 10`
 - [x] Logical operations
   - `a <= 10 | 5 + b < a & 12 == b`
 - [x] If statement
@@ -340,10 +342,10 @@ print('A')
   - `a = [1, 2, [5, 6]]`
   - `a[0] = a[1] + a[-1][1]`
   - `a = a + [9, 10]`
+  - `[x, y] = [1, 2]`
+  - Unpack `[x, y, [z, w]] = a`
   - Slices: `a[0, 2]` -> `[1, 2]`
-  - TODO:
-    - Append without making a copy: `a << 10?`
-    - `[x, y, z] = a`
+  - Append: `a << 10`
 - [x] Strings
   - `a = "Hello world"`
   - `print(a)`

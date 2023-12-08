@@ -28,6 +28,9 @@ pub enum Operator {
     Greater,
     GreaterEq,
     Not,
+
+    LeftShift,
+    RightShift,
 }
 impl Operator {
     pub fn all_bin() -> Vec<HashSet<Operator>> {
@@ -45,6 +48,8 @@ impl Operator {
                 Operator::Eq,
                 Operator::Neq,
             ]),
+            // Bitshift
+            HashSet::from([Operator::LeftShift, Operator::RightShift]),
             // Sum
             HashSet::from([Operator::Add, Operator::Sub]),
             // Mul
@@ -67,6 +72,8 @@ impl Operator {
             Operator::LessEq => Operation::Leq,
             Operator::Greater => Operation::Gt,
             Operator::GreaterEq => Operation::Geq,
+            Operator::LeftShift => Operation::LeftShift,
+            Operator::RightShift => Operation::RightShift,
             _ => return None,
         })
     }

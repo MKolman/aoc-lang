@@ -319,7 +319,7 @@ print('A')
 ## Language TODO list
 
 - [x] Arithmetic operations
-  - `1 + 3 / (2 - 10)`
+  - `1 + 3 / (2 - 10) << 2`
 - [x] Printing
   - `print(12 * 3)`
 - [x] Variables
@@ -345,8 +345,7 @@ print('A')
   - `[x, y] = [1, 2]`
   - Unpack `[x, y, [z, w]] = a`
   - Slices: `a[0, 2]` -> `[1, 2]`
-  - TODO:
-    - Append without making a copy: `a << 10?`
+  - Append: `a << 10`
 - [x] Strings
   - `a = "Hello world"`
   - `print(a)`

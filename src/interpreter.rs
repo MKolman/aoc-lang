@@ -85,6 +85,8 @@ impl<W: Write> Interpreter<W> {
                 Operation::Lt => self.binary(&Self::op_lt),
                 Operation::Leq => self.binary(&Self::op_leq),
                 Operation::VecGet => self.binary(&Self::op_vec_get),
+                Operation::LeftShift => self.binary(&Self::op_left_shift),
+                Operation::RightShift => self.binary(&Self::op_right_shift),
                 Operation::VecSlice => self.tertiary(&Self::op_vec_slice),
                 Operation::VecSet => self.tertiary(&Self::op_vec_set),
                 Operation::VecCollect(n) => self.vec_collect(n as usize),
@@ -284,6 +286,28 @@ impl<W: Write> Interpreter<W> {
 
     fn op_neq(left: Value, right: Value) -> Result<Value> {
         Self::op_not(Self::op_eq(left, right)?)
+    }
+
+    fn op_left_shift(left: Value, right: Value) -> Result<Value> {
+        match (left, right) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a << b)),
+            (Value::Vec(v), val) => {
+                v.borrow_mut().push(val.clone());
+                Ok(val)
+            }
+            (a, b) => Err(format!("Unsupported LeftShift for {a} and {b}").into()),
+        }
+    }
+
+    fn op_right_shift(left: Value, right: Value) -> Result<Value> {
+        match (left, right) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a >> b)),
+            (val, Value::Vec(v)) => {
+                v.borrow_mut().push(val);
+                Ok(Value::Vec(v))
+            }
+            (a, b) => Err(format!("Unsupported RightShift for {a} and {b}").into()),
+        }
     }
 
     fn op_jump_if(&mut self, n: i64) -> Result<()> {

@@ -90,6 +90,8 @@ pub enum TokenType {
     StarEq,
     SlashEq,
     PercentEq,
+    LessLess,
+    GreaterGreater,
     // End
     EOL,
     EOF,
@@ -135,6 +137,8 @@ impl TokenType {
             TokenType::LessEq => Operator::LessEq,
             TokenType::Greater => Operator::Greater,
             TokenType::GreaterEq => Operator::GreaterEq,
+            TokenType::LessLess => Operator::LeftShift,
+            TokenType::GreaterGreater => Operator::RightShift,
             _ => return None,
         };
         Some(op)

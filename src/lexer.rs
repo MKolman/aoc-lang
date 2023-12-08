@@ -28,8 +28,17 @@ impl<'a> Lexer<'a> {
                 '|' => self.one_or_two('|', TokenType::Pipe, TokenType::PipePipe),
                 '!' => self.one_or_two('=', TokenType::Bang, TokenType::BangEq),
                 '=' => self.one_or_two('=', TokenType::Eq, TokenType::EqEq),
-                '<' => self.one_or_two('=', TokenType::Less, TokenType::LessEq),
-                '>' => self.one_or_two('=', TokenType::Greater, TokenType::GreaterEq),
+                '<' => self.one_or_twos(
+                    TokenType::Less,
+                    &[('=', TokenType::LessEq), ('<', TokenType::LessLess)],
+                ),
+                '>' => self.one_or_twos(
+                    TokenType::Greater,
+                    &[
+                        ('=', TokenType::GreaterEq),
+                        ('>', TokenType::GreaterGreater),
+                    ],
+                ),
                 '{' => self.one_or_two('=', TokenType::LBrace, TokenType::OBrace),
                 '}' => self.one(TokenType::RBrace),
                 '(' => self.one(TokenType::LParen),
@@ -64,12 +73,18 @@ impl<'a> Lexer<'a> {
     }
 
     fn one_or_two(&mut self, if_char: char, if_one: TokenType, if_two: TokenType) -> Token {
+        self.one_or_twos(if_one, &[(if_char, if_two)])
+    }
+
+    fn one_or_twos(&mut self, default: TokenType, ifs: &[(char, TokenType)]) -> Token {
         let (start, first) = self.iter.next().expect("Needs one character");
-        if matches!(self.iter.peek(), Some((_, c)) if c == &if_char) {
-            let (end, second) = self.iter.next().expect("peek() was Some");
-            return Token::new(start, end + second.len_utf8(), if_two);
+        for (if_char, if_two) in ifs {
+            if matches!(self.iter.peek(), Some((_, c)) if c == if_char) {
+                let (end, second) = self.iter.next().expect("peek() was Some");
+                return Token::new(start, end + second.len_utf8(), if_two.clone());
+            }
         }
-        Token::new(start, start + first.len_utf8(), if_one)
+        Token::new(start, start + first.len_utf8(), default)
     }
 
     fn comment(&mut self) -> Token {

@@ -11,6 +11,8 @@ pub enum Operation {
     Mul,
     Div,
     Mod,
+    LeftShift,
+    RightShift,
     Negate,
     UnaryPlus,
 

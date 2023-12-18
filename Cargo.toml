@@ -1,6 +1,6 @@
 [package]
 name = "aoc-lang"
-version = "0.3.6"
+version = "0.3.7"
 authors = ["Maks Kolman <kolman.maks@gmail.com>"]
 edition = "2021"
 

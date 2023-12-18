@@ -3,7 +3,7 @@
   "collaborators": [
     "Maks Kolman <kolman.maks@gmail.com>"
   ],
-  "version": "0.3.6",
+  "version": "0.3.7",
   "files": [
     "aoc_lang_bg.wasm",
     "aoc_lang.js",

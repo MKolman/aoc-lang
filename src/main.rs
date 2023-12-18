@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, rc::Rc};
 
 use aoc_lang::aoc::{compile_and_run, debug_run};
 
@@ -46,13 +46,13 @@ fn main() {
         );
         return;
     }
-    let runner: fn(&str) -> aoc_lang::runtime::Value = if args.debug {
+    let runner: fn(Rc<str>) -> aoc_lang::runtime::Value = if args.debug {
         |code| debug_run(code, &mut std::io::stdout())
     } else {
         |code| compile_and_run(code, &mut std::io::stdout())
     };
     for fname in &args.fnames {
-        let code = &fs::read_to_string(fname).expect("File not found");
-        runner(code);
+        let code = fs::read_to_string(fname).expect("File not found");
+        runner(code.into());
     }
 }

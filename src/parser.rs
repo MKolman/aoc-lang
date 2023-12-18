@@ -9,12 +9,14 @@ use crate::token::{Pos, Token, TokenType};
 type Error = error::Error<error::ParserError>;
 type Result<T> = error::Result<T, error::ParserError>;
 
-pub struct Parser<'a> {
-    tokens: std::iter::Peekable<Lexer<'a>>,
+pub struct Parser {
+    code: Rc<str>,
+    tokens: std::iter::Peekable<Lexer>,
 }
-impl<'a> Parser<'a> {
+impl Parser {
     pub fn new(tokens: Lexer) -> Parser {
         Parser {
+            code: tokens.get_input(),
             tokens: tokens.into_iter().peekable(),
         }
     }
@@ -30,13 +32,13 @@ impl<'a> Parser<'a> {
             self.skip_whitespace();
         }
         if result.len() == 0 {
-            result.push(Expr::new(Pos::new(0, 0), ExprType::Nil));
+            result.push(self.make_expr(Pos::new(0, 0), ExprType::Nil));
         }
         let pos = result
             .iter()
             .map(|e| e.pos)
             .fold(result[0].pos, |a, b| a + b);
-        Ok(Expr::new(pos, ExprType::Block(result)))
+        Ok(self.make_expr(pos, ExprType::Block(result)))
     }
 
     fn parse_single(&mut self) -> Result<Expr> {
@@ -50,7 +52,7 @@ impl<'a> Parser<'a> {
         if let Some((_, op)) = self.try_consume_assign_operator() {
             let right = self.parse_assignment()?;
             if op == Operator::Eq {
-                left = Expr::new(
+                left = self.make_expr(
                     left.pos + right.pos,
                     ExprType::Assign {
                         left: Box::new(left),
@@ -58,7 +60,7 @@ impl<'a> Parser<'a> {
                     },
                 )
             } else {
-                left = Expr::new(
+                left = self.make_expr(
                     left.pos + right.pos,
                     ExprType::AssignOp {
                         op,
@@ -77,7 +79,7 @@ impl<'a> Parser<'a> {
             let start_pos = left.pos;
             while let Some((_, op)) = self.try_consume_operator(Some(bin_ops)) {
                 let right = self.parse_binary_op(idx + 1)?;
-                left = Expr::new(
+                left = self.make_expr(
                     start_pos + right.pos,
                     ExprType::BinaryOp {
                         op,
@@ -95,10 +97,7 @@ impl<'a> Parser<'a> {
     fn parse_unary_op(&mut self) -> Result<Expr> {
         if let Some((pos, op)) = self.try_consume_operator(None) {
             let exp = self.parse_unary_op()?;
-            return Ok(Expr::new(
-                pos + exp.pos,
-                ExprType::UnaryOp(op, Box::new(exp)),
-            ));
+            return Ok(self.make_expr(pos + exp.pos, ExprType::UnaryOp(op, Box::new(exp))));
         }
         self.parse_fn_vec()
     }
@@ -109,7 +108,7 @@ impl<'a> Parser<'a> {
             if let Some(start_loc) = self.try_consume(&TokenType::LBracket) {
                 let args = self.parse_comma_sep_values(&TokenType::RBracket)?;
                 let end_loc = self.consume(&TokenType::RBracket)?;
-                left = Expr::new(
+                left = self.make_expr(
                     start_loc + end_loc,
                     ExprType::VecGet {
                         vec: Box::new(left),
@@ -121,7 +120,7 @@ impl<'a> Parser<'a> {
             if let Some(start_loc) = self.try_consume(&TokenType::LParen) {
                 let args = self.parse_comma_sep_values(&TokenType::RParen)?;
                 let end_loc = self.consume(&TokenType::RParen)?;
-                left = Expr::new(
+                left = self.make_expr(
                     start_loc + end_loc,
                     ExprType::FnCall {
                         func: Box::new(left),
@@ -131,10 +130,11 @@ impl<'a> Parser<'a> {
                 continue;
             }
             if let Some(start_pos) = self.try_consume(&TokenType::Dot) {
-                let next = self
-                    .tokens
-                    .next()
-                    .ok_or(Error::build("EOF while parsing".into(), start_pos))?;
+                let next = self.tokens.next().ok_or(Error::build(
+                    "EOF while parsing".into(),
+                    start_pos,
+                    &self.code,
+                ))?;
                 let Token {
                     pos,
                     kind: TokenType::Identifier(name),
@@ -143,13 +143,14 @@ impl<'a> Parser<'a> {
                     return Err(Error::build(
                         format!("Expected an identifier after a dot not {:?}", next.kind),
                         next.pos,
+                        &self.code,
                     ));
                 };
-                left = Expr::new(
+                left = self.make_expr(
                     start_pos + pos,
                     ExprType::VecGet {
                         vec: Box::new(left),
-                        idx: vec![Expr::new(pos, ExprType::Str(Rc::new(name)))],
+                        idx: vec![self.make_expr(pos, ExprType::Str(Rc::new(name)))],
                     },
                 );
                 continue;
@@ -162,11 +163,11 @@ impl<'a> Parser<'a> {
     fn parse_atom(&mut self) -> Result<Expr> {
         if let Some(Token { kind, pos }) = self.tokens.next() {
             match kind {
-                TokenType::Nil => Ok(Expr::new(pos, ExprType::Nil)),
-                TokenType::Integer(n) => Ok(Expr::new(pos, ExprType::Int(n))),
-                TokenType::Float(n) => Ok(Expr::new(pos, ExprType::Float(n))),
-                TokenType::Identifier(name) => Ok(Expr::new(pos, ExprType::Identifier(name))),
-                TokenType::String(s) => Ok(Expr::new(pos, ExprType::Str(Rc::new(s)))),
+                TokenType::Nil => Ok(self.make_expr(pos, ExprType::Nil)),
+                TokenType::Integer(n) => Ok(self.make_expr(pos, ExprType::Int(n))),
+                TokenType::Float(n) => Ok(self.make_expr(pos, ExprType::Float(n))),
+                TokenType::Identifier(name) => Ok(self.make_expr(pos, ExprType::Identifier(name))),
+                TokenType::String(s) => Ok(self.make_expr(pos, ExprType::Str(Rc::new(s)))),
                 TokenType::LParen => self.parse_paren(),
                 TokenType::If => self.parse_if(pos),
                 TokenType::While => self.parse_while(pos),
@@ -179,7 +180,11 @@ impl<'a> Parser<'a> {
                 TokenType::LBracket => self.parse_vec(pos),
                 TokenType::Return => self.parse_return(pos),
                 TokenType::Use => self.parse_use(pos),
-                t => Err(Error::build(format!("Unexpected token {t:?}"), pos)),
+                t => Err(Error::build(
+                    format!("Unexpected token {t:?}"),
+                    pos,
+                    &self.code,
+                )),
             }
         } else {
             Err(format!("Unexpected EOF while parsing").into())
@@ -190,18 +195,18 @@ impl<'a> Parser<'a> {
         self.consume(&TokenType::LParen)?;
         let args = self.parse_comma_sep_values(&TokenType::RParen)?;
         let end_pos = self.consume(&TokenType::RParen)?;
-        Ok(Expr::new(start_pos + end_pos, ExprType::Print(args)))
+        Ok(self.make_expr(start_pos + end_pos, ExprType::Print(args)))
     }
 
     fn parse_read(&mut self, start_pos: Pos) -> Result<Expr> {
         self.consume(&TokenType::LParen)?;
         let end_pos = self.consume(&TokenType::RParen)?;
-        Ok(Expr::new(start_pos + end_pos, ExprType::Read))
+        Ok(self.make_expr(start_pos + end_pos, ExprType::Read))
     }
 
     fn parse_object(&mut self, start_pos: Pos) -> Result<Expr> {
         self.consume(&TokenType::RBrace)?;
-        Ok(Expr::new(start_pos, ExprType::ObjectDef(Vec::new())))
+        Ok(self.make_expr(start_pos, ExprType::ObjectDef(Vec::new())))
     }
 
     fn parse_fn_def(&mut self, start_pos: Pos) -> Result<Expr> {
@@ -217,6 +222,7 @@ impl<'a> Parser<'a> {
                             e.kind
                         ),
                         e.pos,
+                        &self.code,
                     ));
                 };
                 Ok(name)
@@ -225,7 +231,7 @@ impl<'a> Parser<'a> {
         self.consume(&TokenType::RParen)?;
 
         let body = self.parse_single()?;
-        Ok(Expr::new(
+        Ok(self.make_expr(
             start_pos + body.pos,
             ExprType::FnDef {
                 args: args_names,
@@ -237,7 +243,7 @@ impl<'a> Parser<'a> {
     fn parse_vec(&mut self, start_pos: Pos) -> Result<Expr> {
         let result = self.parse_comma_sep_values(&TokenType::RBracket)?;
         let end_pos = self.consume(&TokenType::RBracket)?;
-        Ok(Expr::new(start_pos + end_pos, ExprType::VecDef(result)))
+        Ok(self.make_expr(start_pos + end_pos, ExprType::VecDef(result)))
     }
 
     fn parse_comma_sep_values(&mut self, terminator: &TokenType) -> Result<Vec<Expr>> {
@@ -267,7 +273,7 @@ impl<'a> Parser<'a> {
             self.skip_whitespace();
         }
         let end_pos = self.consume(&TokenType::RBrace)?;
-        Ok(Expr::new(pos + end_pos, ExprType::Block(result)))
+        Ok(self.make_expr(pos + end_pos, ExprType::Block(result)))
     }
 
     fn parse_if(&mut self, pos: Pos) -> Result<Expr> {
@@ -277,7 +283,7 @@ impl<'a> Parser<'a> {
         if self.try_consume(&TokenType::Else).is_some() {
             elsebody = Some(Box::new(self.parse_single()?));
         }
-        Ok(Expr::new(
+        Ok(self.make_expr(
             pos + body.pos,
             ExprType::If {
                 cond: Box::new(cond),
@@ -291,7 +297,7 @@ impl<'a> Parser<'a> {
         let cond = self.parse_single()?;
         let body = self.parse_single()?;
         let pos = start_pos + body.pos;
-        Ok(Expr::new(
+        Ok(self.make_expr(
             pos,
             ExprType::While {
                 cond: Box::new(cond),
@@ -305,15 +311,15 @@ impl<'a> Parser<'a> {
         let cond = self.parse_single()?;
         let suff = self.parse_single()?;
         let body = self.parse_single()?;
-        Ok(Expr::new(
+        Ok(self.make_expr(
             start_pos + body.pos,
             ExprType::Block(vec![
                 init,
-                Expr::new(
+                self.make_expr(
                     cond.pos + body.pos,
                     ExprType::While {
                         cond: Box::new(cond),
-                        body: Box::new(Expr::new(body.pos, ExprType::Block(vec![body, suff]))),
+                        body: Box::new(self.make_expr(body.pos, ExprType::Block(vec![body, suff]))),
                     },
                 ),
             ]),
@@ -322,10 +328,7 @@ impl<'a> Parser<'a> {
 
     fn parse_return(&mut self, start_pos: Pos) -> Result<Expr> {
         let result = self.parse_single()?;
-        Ok(Expr::new(
-            start_pos + result.pos,
-            ExprType::Return(Box::new(result)),
-        ))
+        Ok(self.make_expr(start_pos + result.pos, ExprType::Return(Box::new(result))))
     }
 
     fn parse_use(&mut self, start_pos: Pos) -> Result<Expr> {
@@ -337,9 +340,10 @@ impl<'a> Parser<'a> {
             return Err(Error::build(
                 "Expected a string literal after use not".into(),
                 start_pos,
+                &self.code,
             ));
         };
-        Ok(Expr::new(start_pos + pos, ExprType::Use(filename)))
+        Ok(self.make_expr(start_pos + pos, ExprType::Use(filename)))
     }
 
     fn skip_whitespace(&mut self) {
@@ -409,6 +413,7 @@ impl<'a> Parser<'a> {
             return Err(Error::build(
                 format!("Unexpected token {kind:?}, expected {consume_type:?}"),
                 pos,
+                &self.code,
             ));
         }
         Ok(pos)
@@ -419,5 +424,9 @@ impl<'a> Parser<'a> {
             Some(Token { pos: _, kind }) => kind == check_type,
             _ => false,
         }
+    }
+
+    fn make_expr(&self, pos: Pos, kind: ExprType) -> Expr {
+        Expr::new(self.code.clone(), pos, kind)
     }
 }

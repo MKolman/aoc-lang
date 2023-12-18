@@ -144,13 +144,14 @@ pub enum ExprType {
 
 #[derive(PartialEq, Clone)]
 pub struct Expr {
+    pub code: Rc<str>,
     pub pos: Pos,
     pub kind: ExprType,
 }
 
 impl Expr {
-    pub fn new(pos: Pos, kind: ExprType) -> Self {
-        Self { pos, kind }
+    pub fn new(code: Rc<str>, pos: Pos, kind: ExprType) -> Self {
+        Self { code, pos, kind }
     }
 
     pub fn to_chunk(&self, mut chunk: Chunk) -> Result<Chunk> {
@@ -167,7 +168,7 @@ impl Expr {
 
                 chunk.push_op(
                     op.try_into_binary()
-                        .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
+                        .ok_or_else(|| self.err(format!("Invalid binary operator {op:?}")))?,
                     self.pos,
                 );
             }
@@ -233,7 +234,7 @@ impl Expr {
                         (chunk.num_bytecode() + 1usize - start_idx)
                             .try_into()
                             .map_err(Error::from)
-                            .wrap("Loop body longer than 255 bytecode", self.pos)?,
+                            .wrap("Loop body longer than 255 bytecode", self.pos, &self.code)?,
                     ),
                     self.pos,
                 );
@@ -250,7 +251,7 @@ impl Expr {
                 ExprType::Identifier(var) => {
                     let idx = chunk
                         .lookup_var(var, false)
-                        .ok_or(self.err(format!("Unknown variable {var}")))?;
+                        .ok_or_else(|| self.err(format!("Unknown variable {var}")))?;
                     chunk.push_op(
                         Operation::GetVar(
                             self.to_u8(idx, "More than 255 variables in local scope")?,
@@ -260,7 +261,7 @@ impl Expr {
                     chunk = right.to_chunk(chunk)?;
                     chunk.push_op(
                         op.try_into_binary()
-                            .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
+                            .ok_or_else(|| self.err(format!("Invalid binary operator {op:?}")))?,
                         self.pos,
                     );
                     chunk.push_op(
@@ -279,7 +280,7 @@ impl Expr {
                     chunk = right.to_chunk(chunk)?;
                     chunk.push_op(
                         op.try_into_binary()
-                            .ok_or(self.err(format!("Invalid binary operator {op:?}")))?,
+                            .ok_or_else(|| self.err(format!("Invalid binary operator {op:?}")))?,
                         self.pos,
                     );
                     chunk.push_op(Operation::Swap(2), self.pos);
@@ -295,7 +296,7 @@ impl Expr {
             ExprType::Identifier(var) => {
                 let idx = chunk
                     .lookup_var(var, false)
-                    .ok_or(self.err(format!("Unknown variable {var}")))?;
+                    .ok_or_else(|| self.err(format!("Unknown variable {var}")))?;
                 chunk.push_op(
                     Operation::GetVar(self.to_u8(idx, "More than 255 variables in local scope")?),
                     self.pos,
@@ -380,15 +381,24 @@ impl Expr {
             ExprType::Use(filename) => {
                 let code = std::fs::read_to_string(filename)
                     .map_err(Error::from)
-                    .wrap(&format!("cannot open imported file {filename}"), self.pos)?;
-                let tokens = lexer::Lexer::new(&code);
+                    .wrap(
+                        &format!("cannot open imported file {filename}"),
+                        self.pos,
+                        &self.code,
+                    )?;
+                let tokens = lexer::Lexer::new(Rc::from(code));
                 let expr = parser::Parser::new(tokens)
                     .parse()
                     .map_err(Error::from)
-                    .wrap(&format!("cannot parse imported file {filename}"), self.pos)?;
-                let use_chunk = expr.to_chunk(Chunk::default()).wrap(
+                    .wrap(
+                        &format!("cannot parse imported file {filename}"),
+                        self.pos,
+                        &self.code,
+                    )?;
+                let use_chunk = expr.to_chunk(expr.code.clone().into()).wrap(
                     &format!("could not compile imported file {filename}"),
                     self.pos,
+                    &self.code,
                 )?;
                 let f = Value::Fn {
                     num_params: 0,
@@ -440,7 +450,7 @@ impl Expr {
     }
 
     fn err(&self, msg: String) -> Error {
-        Error::new(msg).stack(self.pos)
+        Error::new(msg).stack(self.pos, &self.code)
     }
 
     fn constant(&self, chunk: &mut Chunk, v: Value) -> Result<()> {
@@ -451,7 +461,9 @@ impl Expr {
     }
 
     fn to_u8(&self, n: usize, msg: &str) -> Result<u8> {
-        n.try_into().map_err(Error::from).wrap(msg, self.pos)
+        n.try_into()
+            .map_err(Error::from)
+            .wrap(msg, self.pos, &self.code)
     }
 }
 
@@ -462,30 +474,5 @@ impl std::fmt::Debug for Expr {
         } else {
             write!(f, "{:?}", self.kind)
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn basic() {
-        let expr = Expr {
-            pos: Pos::new(0, 0),
-            kind: ExprType::BinaryOp {
-                op: Operator::Add,
-                left: Box::new(Expr {
-                    pos: Pos::new(0, 0),
-                    kind: ExprType::Int(1),
-                }),
-                right: Box::new(Expr {
-                    pos: Pos::new(0, 0),
-                    kind: ExprType::Int(2),
-                }),
-            },
-        };
-        let chunk = expr.to_chunk(Chunk::default()).unwrap();
-        assert_eq!(chunk.num_bytecode(), 3);
-        assert_eq!(chunk.num_const(), 2);
     }
 }

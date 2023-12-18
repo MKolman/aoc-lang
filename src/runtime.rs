@@ -184,6 +184,7 @@ pub enum Capture {
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
+    pub code: Rc<str>,
     pub bytecode: Vec<Operation>,
     pub pos: Vec<Pos>,
     pub constants: Vec<Value>,
@@ -195,7 +196,7 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn to_child(self) -> Self {
-        let mut child = Self::default();
+        let mut child: Chunk = self.code.clone().into();
         child.parent = Some(Box::new(self));
         child
     }
@@ -278,6 +279,7 @@ impl Chunk {
             return Err(error::Error::build(
                 "Jumping from a non-existent instruction!".into(),
                 self.pos[idx - 1],
+                &self.code,
             ));
         }
 
@@ -288,6 +290,7 @@ impl Chunk {
                     error::Error::from(e).wrap(
                         &format!("Trying to jump {tmp} instructions which does not fit into u8"),
                         self.pos[from],
+                        &self.code,
                     )
                 })?;
                 Ok(())
@@ -295,14 +298,16 @@ impl Chunk {
             _ => Err(error::Error::build(
                 "Jumping from a non-jump instruction!".into(),
                 self.pos[from],
+                &self.code,
             )),
         }
     }
 }
 
-impl Default for Chunk {
-    fn default() -> Self {
+impl From<Rc<str>> for Chunk {
+    fn from(code: Rc<str>) -> Self {
         Self {
+            code,
             bytecode: vec![],
             pos: vec![],
             constants: vec![],

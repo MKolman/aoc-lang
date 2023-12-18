@@ -1,23 +1,23 @@
 use std::fmt::Display;
 
-use crate::token::Pos;
+use crate::token::{Pos, Snippet};
 
 pub type Result<T, E> = std::result::Result<T, Error<E>>;
 
 pub trait Stackable {
-    fn stack(self, pos: Pos) -> Self;
+    fn stack(self, pos: Pos, code: &str) -> Self;
     fn context(self, context: &str) -> Self;
-    fn wrap(self, context: &str, pos: Pos) -> Self
+    fn wrap(self, context: &str, pos: Pos, code: &str) -> Self
     where
         Self: Sized,
     {
-        self.stack(pos).context(context)
+        self.stack(pos, code).context(context)
     }
 }
 
 impl<T, E: Stackable> Stackable for std::result::Result<T, E> {
-    fn stack(self, pos: Pos) -> Self {
-        self.map_err(|e| e.stack(pos))
+    fn stack(self, pos: Pos, code: &str) -> Self {
+        self.map_err(|e| e.stack(pos, code))
     }
     fn context(self, context: &str) -> Self {
         self.map_err(|e| e.context(context))
@@ -41,7 +41,7 @@ pub struct Error<E: Kind> {
     underlying: Option<Box<dyn std::error::Error>>,
     kind: E,
     context: String,
-    stack: Vec<Pos>,
+    stack: Vec<Snippet>,
 }
 
 impl<E: Kind> Error<E> {
@@ -62,35 +62,36 @@ impl<E: Kind> Error<E> {
         }
     }
 
-    pub fn build(context: String, pos: Pos) -> Self {
+    pub fn build(context: String, pos: Pos, code: &str) -> Self {
         Self {
             underlying: None,
             kind: E::default(),
             context,
-            stack: vec![pos],
+            stack: vec![pos.extract(code)],
         }
     }
 
-    pub fn stack_trace(&self, code: &str) -> String {
-        let mut result = String::new();
-        for pos in &self.stack {
-            let crate::token::Snippet {
-                line,
-                col,
-                line_prefix,
-                snippet,
-                line_suffix,
-            } = pos.extract(code);
-            result.push_str(&format!(
-                "on line {line}:{col}: {line_prefix}\x1b[91m\x1b[1m{snippet}\x1b[0m{line_suffix}\n",
-            ));
-        }
-        result
+    pub fn stack_trace(&self) -> String {
+        self.stack
+            .iter()
+            .map(
+                |Snippet {
+                     line,
+                     col,
+                     line_prefix,
+                     snippet,
+                     line_suffix,
+                 }| {
+                    format!("on line {line}:{col}: {line_prefix}\x1b[91m\x1b[1m{snippet}\x1b[0m{line_suffix}")
+                },
+            )
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 impl<T: Kind> Stackable for Error<T> {
-    fn stack(mut self, pos: Pos) -> Self {
-        self.stack.push(pos);
+    fn stack(mut self, pos: Pos, code: &str) -> Self {
+        self.stack.push(pos.extract(code));
         self
     }
     fn context(mut self, context: &str) -> Self {
@@ -106,10 +107,11 @@ impl<T: Kind> From<String> for Error<T> {
 
 impl<T: Kind> Display for Error<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}: {}", self.kind, self.context)?;
+        writeln!(f, "{:?}: {}", self.kind, self.context)?;
         if let Some(e) = &self.underlying {
-            write!(f, "\n{}", e)?;
+            writeln!(f, "{}", e)?;
         };
+        write!(f, "{}", self.stack_trace())?;
         Ok(())
     }
 }

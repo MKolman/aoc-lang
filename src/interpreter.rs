@@ -112,7 +112,7 @@ impl<W: Write> Interpreter<W> {
                     Ok(())
                 }
             };
-            result.stack(self.chunk.pos[self.idx - 1])?;
+            result.stack(self.chunk.pos[self.idx - 1], &self.chunk.code)?;
         }
         Ok(self.stack.pop().expect("frame did not return a value"))
     }

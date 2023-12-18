@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, rc::Rc};
 
 use crate::aoc::compile_and_run;
 
@@ -29,10 +29,10 @@ fn run_single_example(test_case: &str) {
 
 fn run_and_compare(code_file: &str, out_file: &str) {
     println!("TESTING {} AND {}", code_file, out_file);
-    let code = fs::read_to_string(code_file).expect("Invalid code file");
+    let code = Rc::from(fs::read_to_string(code_file).expect("Invalid code file"));
     let want = fs::read_to_string(out_file).expect("Invalid out file");
     let mut output = Vec::new();
-    compile_and_run(&code, &mut output);
+    compile_and_run(code, &mut output);
     // Do writing here.
     assert_eq!(
         String::from_utf8_lossy(&output),

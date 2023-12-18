@@ -1,19 +1,23 @@
-use std::{iter::Peekable, str::CharIndices};
+use std::{iter::Peekable, rc::Rc};
 
 use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone)]
-pub struct Lexer<'a> {
-    input: &'a str,
-    iter: Peekable<CharIndices<'a>>,
+pub struct Lexer {
+    input: Rc<str>,
+    iter: Peekable<std::vec::IntoIter<(usize, char)>>,
     eof: bool,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl Lexer {
+    pub fn new(input: Rc<str>) -> Self {
         Self {
-            input,
-            iter: input.char_indices().peekable(),
+            input: input.clone(),
+            iter: input
+                .char_indices()
+                .collect::<Vec<(usize, char)>>()
+                .into_iter()
+                .peekable(),
             eof: false,
         }
     }
@@ -151,18 +155,22 @@ impl<'a> Lexer<'a> {
             res.push(c);
         }
         let (end, _) = self.iter.next().expect("Strings end with '\"'");
-        Token::new(start, end, TokenType::String(res))
+        Token::new(start, end + 1, TokenType::String(res))
     }
 
     fn char(&mut self) -> Token {
         let (start, _) = self.iter.next().expect("Chars start with '\''");
         let (_, c) = self.iter.next().expect("EOF while reading a character");
         let (end, _) = self.iter.next().expect("Chars end with '\''");
-        Token::new(start, end, TokenType::Integer(c as i64))
+        Token::new(start, end + 1, TokenType::Integer(c as i64))
+    }
+
+    pub fn get_input(&self) -> Rc<str> {
+        self.input.clone()
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
+impl Iterator for Lexer {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.get_token();
@@ -182,7 +190,7 @@ mod test {
 
     #[test]
     fn arithmetic() {
-        let s = Lexer::new("a = 12 + 3.5 * 12 / 0.1");
+        let s = Lexer::new(Rc::from("a = 12 + 3.5 * 12 / 0.1"));
         assert_eq!(
             s.map(|t| t.kind).collect::<Vec<_>>(),
             vec![
@@ -202,7 +210,7 @@ mod test {
 
     #[test]
     fn comment() {
-        let s = Lexer::new("if for while print fn # test comment\n\tread");
+        let s = Lexer::new(Rc::from("if for while print fn # test comment\n\tread"));
         assert_eq!(
             s.map(|t| t.kind).collect::<Vec<_>>(),
             vec![
